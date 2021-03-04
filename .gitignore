@@ -1,0 +1,11 @@
+lib
+bin
+.venv
+**.csv
+!result_**.csv
+**.env
+**.png
+**.pdf
+
+**/__pycache__
+src/read-orderbook-py

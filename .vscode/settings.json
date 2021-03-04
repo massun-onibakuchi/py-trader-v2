@@ -1,0 +1,48 @@
+{
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    // ファイルの終了時に行末のスペース削除
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "python.linting.lintOnSave": true,
+    //Tabをスペースキーとして変換
+    "[python]": {
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": true,
+        "editor.tabSize": 4
+    },
+    "python.pythonPath": ".venv/bin/python",
+    "python.venvPath": ".venv",
+    // "python.venvPath": ".venv",
+    "python.linting.pylintEnabled": false,
+    // "python.linting.mypyEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=120",
+        "--max-complexity=20",
+        "--ignore=F841,W504",
+    ],
+    "python.formatting.provider": "autopep8",
+    "python.formatting.autopep8Args": [
+        "--aggressive",
+        "--aggressive",
+    ],
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        ".",
+        "-p",
+        "*test.py"
+    ],
+    "files.exclude": {
+        "**/*.pyc": true,
+        ".nyc_output": true,
+        "obj": true,
+        "bin": true,
+        "lib":true,
+        ".venv":true,
+        "**/__pycache__": true,
+        "**/.mypy_cache/**": true,
+    },
+    "python.linting.enabled": true,
+}
