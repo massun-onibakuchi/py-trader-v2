@@ -18,6 +18,8 @@ def auth():
 # Rate limits https://developer.twitter.com/en/docs/rate-limits
 # 450 requests per 15 - minute window(app auth)
 # 180 requests per 15 - minute window(user auth)
+
+
 def create_url(queries=[]):
     # GET /2/tweets/search/recent
     query_strings = ''

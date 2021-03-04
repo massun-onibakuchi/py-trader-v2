@@ -20,10 +20,10 @@ def push_message(text):
             "text": text
         }]
     }
+    # "https://api.line.me/v2/bot/message/push",
     response = requests.request(
-        "POST",
-        # "https://api.line.me/v2/bot/message/push",
-        "https://api.line.me/v2/bot/message/broadcast",
+        method="POST",
+        url="https://api.line.me/v2/bot/message/broadcast",
         headers=headers,
         data=json.dumps(pay_load))
     print(response.status_code)

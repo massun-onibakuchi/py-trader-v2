@@ -1,4 +1,5 @@
 import asyncio
+from typing import Dict, List, Union
 from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, PYTHON_ENV, SUBACCOUNT, TRADABLE
@@ -6,10 +7,10 @@ import json
 
 
 class Bot:
-    DEFAULT_SIZE = 100
+    DEFAULT_SIZE = 100.0
     SPECIFIC_NAME = ["SPACEX", "STARLINK", "STAR", "STRLK"]
-    SPECIFIC_SIZE = 900
-    prev_markets = []
+    SPECIFIC_SIZE = 900.0
+    prev_markets: List[Dict[str, Union[str, float]]] = []
 
     def __init__(self, api_key, api_secret):
         self.ftx = FTX(
@@ -60,7 +61,7 @@ class Bot:
 
             if TRADABLE:
                 for new in new_listed:
-                    size = self.DEFAULT_SIZE / new["bid"]
+                    size = self.DEFAULT_SIZE / float(new["bid"])
                     if new["baseCurrency"] in self.SPECIFIC_NAME:
                         size = self.SPECIFIC_SIZE
                     if PYTHON_ENV == 'production':
@@ -91,34 +92,36 @@ class Bot:
         await asyncio.sleep(0)
 
     def extract_name(
-            self, markets,
+            self,
+            markets,
             include=["spot", "future"],
             exclude=["HEDGE", "BULL", "BEAR", "HALF", "BVOL"]):
         satsfied = []
+        has_spot = "spot" in include
+        has_future = "future" in include
         for market in markets:
-            if not market["enabled"]:
-                continue
-            if "spot" in include and market['type'] == "spot" and market["quoteCurrency"] == 'USD':
-                is_excluded = True
-                for token in exclude:
-                    is_excluded = is_excluded and not (
-                        token in market["baseCurrency"])
-                if is_excluded:
+            if market["enabled"]:
+                if has_spot and market['type'] == "spot" and market["quoteCurrency"] == 'USD':
+                    is_excluded = True
+                    for token in exclude:
+                        is_excluded = is_excluded and token not in market["baseCurrency"]
+                    if is_excluded:
+                        satsfied.append(market)
+                if has_future and market["type"] == 'future':
                     satsfied.append(market)
-            if "future" in include and market["type"] == 'future':
-                satsfied.append(market)
         return satsfied
 
-    def extract_new_listed(self, prev_markets, current_markets):
+    def extract_new_listed(
+            self,
+            prev_markets: List[Dict[str, Union[str, float]]],
+            current_markets: List[Dict[str, Union[str, float]]]) -> List[Dict[str, Union[str, float]]]:
         new_listed = []
         if len(current_markets) == 0:
             return new_listed
-        for market in prev_markets:
-            name = market["name"]
-            for current_market in current_markets:
-                if name == current_market["name"]:
-                    break
-            else:
+        prev_market_names = [prev_market["name"] for prev_market in prev_markets]
+        for current_market in current_markets:
+            name = current_market["name"]
+            if name not in prev_market_names:
                 new_listed.append(current_market)
         return new_listed
 

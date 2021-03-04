@@ -4,15 +4,12 @@
  - ツイッター監視ロング `./tweet_long.py`
 
 ## Folders
- - setting
+ - `setting`
   set env variable
- - ftx
+ - `ftx`
   ftx api wrapper
- - read-order-book-py
-   read orderbook via ftx websocket api
- - twitter_search
+ - `twitter_search`
    twitter recent reseach
-
 
 ## How to use
 If you use `poetry` ,run
