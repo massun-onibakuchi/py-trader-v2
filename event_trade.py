@@ -4,7 +4,7 @@ from ftx.ftx import FTX
 from twitter_search.recent_research import recent_research
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, PYTHON_ENV, MARKET, SUBACCOUNT, MAX_SIZE, BOT_NAME
-import json
+from pprint import pprint
 
 
 class Bot:
@@ -64,42 +64,84 @@ class Bot:
         for pos in response[0]["result"]:
             if pos["future"] == MARKET:
                 position = pos
-        print("position :>>", position)
+        print("POSITION :>>")
+        pprint(position)
 
         await asyncio.sleep(5)
 
         if position["size"] > float(MAX_SIZE):
-            return
+            print("[Info]: MAX_ENTRY_SIZE")
+        else:
+            query = "query=from:elonmusk -is:retweet"
+            tweet_fields = "tweet.fields=author_id"
+            start_time_fields = self.create_time_fields(sec=10)
+            queries = [query, tweet_fields, start_time_fields]
+            keywords = ['doge', 'Doge', 'DOGE']
+
+            result = recent_research(keywords, queries)
+
+            if len(result) > 0:
+                push_message(f"Detect events:\nkeywords:{keywords}\n{result}")
+                if PYTHON_ENV == 'production':
+                    self.ftx.place_order(
+                        type='market',
+                        market=MARKET,
+                        side='buy',
+                        price='',
+                        size=180,
+                        postOnly=False)
+                else:
+                    self.ftx.place_order(
+                        type='limit',
+                        market=MARKET,
+                        side='buy',
+                        price=1111,
+                        size=0.001,
+                        postOnly=True)
+                response = await self.ftx.send()
+                pprint(response[0])
+                orderId = response[0]['result']['id']
+                push_message(f"Ordered :\norderId:{orderId}")
+
+        await asyncio.sleep(interval)
+
+    async def sample(self, interval):
+        self.ftx.positions()
+        response = await self.ftx.send()
+        position = {}
+        for pos in response[0]["result"]:
+            if pos["future"] == MARKET:
+                position = pos
+        print("POSITION :>>")
+        pprint(position)
+
+        await asyncio.sleep(5)
+
+        if position["size"] > float(MAX_SIZE):
+            print("[Info]: MAX_ENTRY_SIZE")
 
         query = "query=from:elonmusk -is:retweet"
         tweet_fields = "tweet.fields=author_id"
         start_time_fields = self.create_time_fields(sec=10)
         queries = [query, tweet_fields, start_time_fields]
         keywords = ['doge', 'Doge', 'DOGE']
+
         result = recent_research(keywords, queries)
 
         if len(result) > 0:
             push_message(f"Detect events:\nkeywords:{keywords}\n{result}")
-            if PYTHON_ENV == 'production':
-                self.ftx.place_order(
-                    type='market',
-                    market=MARKET,
-                    side='buy',
-                    price='',
-                    size=180,
-                    postOnly=False)
-            else:
-                self.ftx.place_order(
-                    type='limit',
-                    market=MARKET,
-                    side='buy',
-                    price=1111,
-                    size=0.001,
-                    postOnly=True)
+            self.ftx.place_order(
+                type='limit',
+                market=MARKET,
+                side='buy',
+                price=1111,
+                size=0.001,
+                postOnly=True)
             response = await self.ftx.send()
-            print(response[0])
+            pprint(response[0])
             orderId = response[0]['result']['id']
             push_message(f"Ordered :\norderId:{orderId}")
+
         await asyncio.sleep(interval)
 
 

@@ -5,7 +5,6 @@ import json
 from aiohttp import WSMsgType
 import traceback
 import time
-from datetime import datetime
 import hmac
 import hashlib
 from requests import Request

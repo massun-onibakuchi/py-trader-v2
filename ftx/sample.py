@@ -7,7 +7,7 @@ class Sample:
     # ---------------------------------------- #
     # init
     # ---------------------------------------- #
-    def __init__(self,market, api_key, api_secret):
+    def __init__(self, market, api_key, api_secret):
         self.ftx = FTX(market=market, api_key=api_key, api_secret=api_secret)
 
         # タスクの設定およびイベントループの開始

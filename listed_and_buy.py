@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime, timezone
 from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, PYTHON_ENV, SUBACCOUNT, TRADABLE

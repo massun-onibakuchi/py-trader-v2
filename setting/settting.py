@@ -29,4 +29,3 @@ TRADABLE = os.environ.get("TRADABLE")
 
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
 LINE_BEARER_TOKEN = os.environ.get("LINE_BEARER_TOKEN")
-
