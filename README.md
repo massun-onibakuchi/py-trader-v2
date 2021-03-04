@@ -1,4 +1,8 @@
 
+## Strategy
+ - 上場ロング `./listed_and_buy.py`
+ - ツイッター監視ロング `./tweet_long.py`
+
 ## Folders
  - setting
   set env variable
@@ -7,9 +11,10 @@
  - read-order-book-py
    read orderbook via ftx websocket api
  - twitter_search
-   twitter recent reseach api
+   twitter recent reseach
 
-## How to use 
+
+## How to use
 If you use `poetry` ,run
 ` poetry run python file.py`
 

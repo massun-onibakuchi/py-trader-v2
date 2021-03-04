@@ -24,6 +24,7 @@
     ],
     "python.formatting.provider": "autopep8",
     "python.formatting.autopep8Args": [
+        "--max-line-length=90",
         "--aggressive",
         "--aggressive",
     ],
@@ -39,8 +40,8 @@
         ".nyc_output": true,
         "obj": true,
         "bin": true,
-        "lib":true,
-        ".venv":true,
+        "lib": true,
+        ".venv": true,
         "**/__pycache__": true,
         "**/.mypy_cache/**": true,
     },

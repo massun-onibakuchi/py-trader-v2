@@ -6,10 +6,10 @@ import json
 
 
 class Bot:
-    prev_markets = []
-    default_size = 100
+    DEFAULT_SIZE = 100
     SPECIFIC_NAME = ["SPACEX", "STARLINK", "STAR", "STRLK"]
     SPECIFIC_SIZE = 900
+    prev_markets = []
 
     def __init__(self, api_key, api_secret):
         self.ftx = FTX(
@@ -18,12 +18,7 @@ class Bot:
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
 
-        print(
-            "\nENV:%s \nSUBACCOUNT: %s"
-            % (
-                PYTHON_ENV,
-                SUBACCOUNT
-            ))
+        print(f"ENV:{PYTHON_ENV}\nSUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run()]
@@ -47,7 +42,7 @@ class Bot:
         self.ftx.market()
         response = await self.ftx.send()
         # print(json.dumps(response[0]['result'], indent=2, sort_keys=False))
-        listed = self.extract_name(markets=response[0]['result'])
+        listed = self.extract_name(markets=response[0]['result'], include=["spot"])
         print(json.dumps(listed, indent=2, sort_keys=False))
 
         if self.prev_markets == []:
@@ -65,7 +60,7 @@ class Bot:
 
             if TRADABLE:
                 for new in new_listed:
-                    size = self.default_size / new["bid"]
+                    size = self.DEFAULT_SIZE / new["bid"]
                     if new["baseCurrency"] in self.SPECIFIC_NAME:
                         size = self.SPECIFIC_SIZE
                     if PYTHON_ENV == 'production':
@@ -82,9 +77,7 @@ class Bot:
                         push_message(f"Ordered :\norderId:{orderId}")
                     else:
                         # テスト
-                        print(
-                            f"DEVELOPMENT:>>\nMARKET:{new['name']}\nSIZE:{size}"
-                        )
+                        print(f"DEVELOPMENT:>>\nMARKET:{new['name']}\nSIZE:{size}")
 
             # SNSに通知する
         for new in new_listed:
@@ -99,7 +92,7 @@ class Bot:
 
     def extract_name(
             self, markets,
-            include=["spot"],
+            include=["spot", "future"],
             exclude=["HEDGE", "BULL", "BEAR", "HALF", "BVOL"]):
         satsfied = []
         for market in markets:
