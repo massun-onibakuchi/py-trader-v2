@@ -27,9 +27,14 @@ def push_message(text):
         headers=headers,
         data=json.dumps(pay_load))
     print(response.status_code)
-    if response.status_code != 200:
-        raise Exception(response.status_code, response.text)
-    return response.json()
+    try:
+        if response.status_code != 200:
+            raise Exception(response.status_code, response.text)
+        else:
+            return response.json()
+    except Exception as e:
+        print(e)
+        return {}
 
 
 if __name__ == "__main__":

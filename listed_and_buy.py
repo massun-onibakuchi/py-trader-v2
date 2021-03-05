@@ -7,9 +7,9 @@ import json
 
 
 class Bot:
-    DEFAULT_SIZE = 100.0
+    DEFAULT_USD_SIZE = 100.0
     SPECIFIC_NAME = ["SPACEX", "STARLINK", "STAR", "STRLK"]
-    SPECIFIC_SIZE = 900.0
+    SPECIFIC_USD_SIZE = 900.0
     prev_markets: List[Dict[str, Union[str, float]]] = []
 
     def __init__(self, api_key, api_secret):
@@ -43,14 +43,13 @@ class Bot:
         self.ftx.market()
         response = await self.ftx.send()
         # print(json.dumps(response[0]['result'], indent=2, sort_keys=False))
-        listed = self.extract_name(markets=response[0]['result'], include=["spot"])
+        # 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
+        listed = self.extract_markets(markets=response[0]['result'], include=["spot"])
         print(json.dumps(listed, indent=2, sort_keys=False))
 
-        if self.prev_markets == []:
-            self.prev_markets = listed
-            print("Snapshot markets...")
-        else:
-            # 新規上場を検知
+        # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
+        if len(self.prev_markets) > 0:
+            # 新規上場銘柄を抽出する
             new_listed = self.extract_new_listed(self.prev_markets, listed)
             print(
                 "New Listed...",
@@ -59,39 +58,54 @@ class Bot:
                     indent=2,
                     sort_keys=False))
 
-            if TRADABLE:
-                for new in new_listed:
-                    size = self.DEFAULT_SIZE / float(new["bid"])
-                    if new["baseCurrency"] in self.SPECIFIC_NAME:
-                        size = self.SPECIFIC_SIZE
-                    if PYTHON_ENV == 'production':
-                        self.ftx.place_order(
-                            type='market',
-                            market=new["name"],
-                            side='buy',
-                            price='',
-                            size=size,
-                            postOnly=False)
-                        response = await self.ftx.send()
-                        print(response[0])
-                        orderId = response[0]['result']['id']
-                        push_message(f"Ordered :\norderId:{orderId}")
-                    else:
-                        # テスト
-                        print(f"DEVELOPMENT:>>\nMARKET:{new['name']}\nSIZE:{size}")
+            for new in new_listed:
+                # SNS通知
+                push_message(f"NEW LISTED: {json.dumps(new)}")
 
-            # SNSに通知する
-        for new in new_listed:
-            push_message(f"NEW LISTED: {json.dumps(new)}")
+                usd = self.SPECIFIC_USD_SIZE if new["baseCurrency"] in self.SPECIFIC_NAME else self.DEFAULT_USD_SIZE
+                size = usd / float(new["bid"])
+                await asyncio.sleep(0)
 
+                if TRADABLE and PYTHON_ENV == 'production':
+                    self.ftx.place_order(
+                        type='market',
+                        market=new["name"],
+                        side='buy',
+                        price='',
+                        size=size,
+                        postOnly=False)
+                    response = await self.ftx.send()
+                    print(response[0])
+                    orderId = response[0]['result']['id']
+                    push_message(
+                        f"Ordered :\norderId:{orderId}\n{new['name']}\nSIZE:{size}"
+                    )
+                elif TRADABLE:
+                    # テスト
+                    self.ftx.place_order(
+                        type='limit',
+                        market='ETH-PERP',
+                        side='buy',
+                        price=1000,
+                        size=size,
+                        postOnly=False)
+                    response = await self.ftx.send()
+                    print(response[0])
+                    orderId = response[0]['result']['id']
+                    push_message(f"Ordered :\norderId:{orderId}")
+                    print(f"DEVELOPMENT:>>\nMARKET:{new['name']}\nSIZE:{size}")
+
+        # ---------共通の処理----------
         await asyncio.sleep(interval)
-        # Update...
+
+        # 最新の上場のリストを更新
+        print("Snapshot markets...")
         self.prev_markets = listed
         listed = []
 
         await asyncio.sleep(0)
 
-    def extract_name(
+    def extract_markets(
             self,
             markets,
             include=["spot", "future"],
@@ -103,8 +117,8 @@ class Bot:
             if market["enabled"]:
                 if has_spot and market['type'] == "spot" and market["quoteCurrency"] == 'USD':
                     is_excluded = True
-                    for token in exclude:
-                        is_excluded = is_excluded and token not in market["baseCurrency"]
+                    for keyword in exclude:
+                        is_excluded = is_excluded and keyword not in market["baseCurrency"]
                     if is_excluded:
                         satsfied.append(market)
                 if has_future and market["type"] == 'future':
@@ -120,8 +134,7 @@ class Bot:
             return new_listed
         prev_market_names = [prev_market["name"] for prev_market in prev_markets]
         for current_market in current_markets:
-            name = current_market["name"]
-            if name not in prev_market_names:
+            if current_market["name"] not in prev_market_names:
                 new_listed.append(current_market)
         return new_listed
 

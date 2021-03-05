@@ -1,14 +1,14 @@
 
 ## Strategy
- - 上場ロング `./listed_and_buy.py`
- - ツイッター監視ロング `./tweet_long.py`
+ - 上場ロング `listed_and_buy.py`
+ - ツイッター監視ロング `tweet_long.py`
 
 ## Folders
- - `setting`
+ - `./setting/`
   set env variable
- - `ftx`
+ - `./ftx/`
   ftx api wrapper
- - `twitter_search`
+ - `./twitter/`
    twitter recent reseach
 
 ## How to use

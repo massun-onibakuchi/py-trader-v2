@@ -1,17 +1,23 @@
 import asyncio
 from datetime import datetime, timezone
 from ftx.ftx import FTX
-from twitter_search.recent_research import recent_research
+from twitter.recent_research import recent_research
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, PYTHON_ENV, MARKET, SUBACCOUNT, MAX_SIZE, BOT_NAME
 from pprint import pprint
 
 
 class Bot:
+    MAX_POSITION_SIZE: float = 0.0
     # ---------------------------------------- #
     # init
     # ---------------------------------------- #
+
     def __init__(self, api_key, api_secret):
+        if MAX_SIZE is not None:
+            self.MAX_POSITION_SIZE = float(MAX_SIZE)
+        else:
+            raise ValueError("MAX_SIZE is neither int nor float")
         self.ftx = FTX(
             MARKET,
             api_key=api_key,
@@ -69,7 +75,7 @@ class Bot:
 
         await asyncio.sleep(5)
 
-        if position["size"] > float(MAX_SIZE):
+        if position["size"] > float(self.MAX_POSITION_SIZE):
             print("[Info]: MAX_ENTRY_SIZE")
         else:
             query = "query=from:elonmusk -is:retweet"
@@ -117,7 +123,7 @@ class Bot:
 
         await asyncio.sleep(5)
 
-        if position["size"] > float(MAX_SIZE):
+        if position["size"] > float(self.MAX_POSITION_SIZE):
             print("[Info]: MAX_ENTRY_SIZE")
 
         query = "query=from:elonmusk -is:retweet"
