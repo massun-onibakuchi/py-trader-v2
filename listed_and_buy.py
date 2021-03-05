@@ -30,7 +30,7 @@ class Bot:
     # ---------------------------------------- #
     async def run(self):
         while True:
-            await self.main(5)
+            await self.main(10)
             await asyncio.sleep(0)
 
     async def main(self, interval):
@@ -141,4 +141,9 @@ class Bot:
 
 if __name__ == "__main__":
 
-    Bot(api_key=FTX_API_KEY, api_secret=FTX_API_SECRET)
+    try:
+        Bot(api_key=FTX_API_KEY, api_secret=FTX_API_SECRET)
+    except Exception as e:
+        print('An exception occurred', e)
+        push_message(e)
+        exit(1)

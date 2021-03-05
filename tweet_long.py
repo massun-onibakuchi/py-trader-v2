@@ -146,4 +146,9 @@ class Bot:
 
 if __name__ == "__main__":
 
-    Bot(api_key=FTX_API_KEY, api_secret=FTX_API_SECRET)
+    try:
+        Bot(api_key=FTX_API_KEY, api_secret=FTX_API_SECRET)
+    except Exception as e:
+        print('An exception occurred', e)
+        push_message(e)
+        exit(1)

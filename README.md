@@ -21,16 +21,13 @@ To make the bot reboot automatically when it crashes due to errors, use the fore
 chmod +x forever.py
 ./forever.py file.py
 ```
-
 If you use `poetry` ,run
 ` poetry run python file.py`
 
-For convenience,
-```
-alias po='poetry run'
-alias pp='poetry run python'
+## How to install
+To install Poetry, run
+MaxOSX/Linux
+`curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python3`
+`source $HOME/.poetry/env`
 
-function pdev () {
-  poetry add -D black flake8 pytest
-}
-```
+If fail,run this `apt-get install python3-venv`
