@@ -52,7 +52,7 @@ class Bot:
             # 新規上場銘柄を抽出する
             new_listed = self.extract_new_listed(self.prev_markets, listed)
             print(
-                "New Listed...",
+                "\nNew Listed...",
                 json.dumps(
                     new_listed,
                     indent=2,
@@ -60,7 +60,7 @@ class Bot:
 
             for new in new_listed:
                 # SNS通知
-                push_message(f"NEW LISTED: {json.dumps(new)}")
+                push_message(f"NEW LISTED:\n {json.dumps(new)}")
 
                 usd = self.SPECIFIC_USD_SIZE if new["baseCurrency"] in self.SPECIFIC_NAME else self.DEFAULT_USD_SIZE
                 size = usd / float(new["bid"])

@@ -56,13 +56,6 @@ class Bot:
     async def main(self, interval):
         # main処理
 
-        """
-        # account情報を取得
-        self.ftx.account()
-        response = await self.ftx.send()
-        print(response[0])
-        """
-
         self.ftx.positions()
         response = await self.ftx.send()
         # print(json.dumps(response[0], indent=2, sort_keys=False))
@@ -70,13 +63,13 @@ class Bot:
         for pos in response[0]["result"]:
             if pos["future"] == MARKET:
                 position = pos
-        print("POSITION :>>")
+        print("\nPOSITION :>>")
         pprint(position)
 
         await asyncio.sleep(5)
 
         if position["size"] > float(self.MAX_POSITION_SIZE):
-            print("[Info]: MAX_ENTRY_SIZE")
+            print("\n[Info]: MAX_ENTRY_SIZE")
         else:
             query = "query=from:elonmusk -is:retweet"
             tweet_fields = "tweet.fields=author_id"
