@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from ftx.ftx import FTX
 from twitter.recent_research import recent_research
 from line import push_message
@@ -9,6 +9,7 @@ from pprint import pprint
 
 class Bot:
     MAX_POSITION_SIZE: float = 0.0
+    order_list = []
     # ---------------------------------------- #
     # init
     # ---------------------------------------- #
@@ -41,16 +42,26 @@ class Bot:
     # ---------------------------------------- #
     async def run(self):
         while True:
-            await self.main(5)
-            await asyncio.sleep(0)
+            try:
+                await self.main(5)
+                await asyncio.sleep(0)
+            except Exception as e:
+                print('An exception occurred', e)
+                push_message(e)
+                exit(1)
 
     def create_time_fields(self, sec=10):
+        since_date = ""
+        td = ""
         utc_date = datetime.now(timezone.utc)
-        utc_date = utc_date.replace(second=(utc_date.second - sec) % 60)
-        if PYTHON_ENV != 'production':
-            utc_date = utc_date.replace(day=(utc_date.day - 3) % 60)
+        if PYTHON_ENV != 'production':  # テストの時
+            td = timedelta(days=3)
+            since_date = utc_date - td
+        else:  # 本番のとき 検索開始期間を10s前に設定
+            td = timedelta(seconds=sec)
+            since_date = utc_date - td
         start_time_fields = "start_time=" + \
-            utc_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+            since_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         return start_time_fields
 
     async def main(self, interval):
@@ -68,12 +79,13 @@ class Bot:
 
         await asyncio.sleep(5)
 
+        # 現在のポジションが規定のサイズを超えていたらエントリーしない
         if position["netSize"] > float(self.MAX_POSITION_SIZE):
             print("\n[Info]: MAX_POSITION_SIZE")
         else:
             query = "query=from:elonmusk -is:retweet"
             tweet_fields = "tweet.fields=author_id"
-            start_time_fields = self.create_time_fields(sec=10)
+            start_time_fields = self.create_time_fields(sec=12)
             queries = [query, tweet_fields, start_time_fields]
             keywords = ['doge', 'Doge', 'DOGE']
 
@@ -100,8 +112,13 @@ class Bot:
                 response = await self.ftx.send()
                 pprint(response[0])
                 orderId = response[0]['result']['id']
+                self.order_list.append({
+                    "timestamp": datetime.now(timezone.utc),
+                    "orderId": orderId
+                })
                 push_message(
-                    f"[Order]{PYTHON_ENV}\nMARKET:{MARKET}\norderId:{orderId}")
+                    f"[Order]{PYTHON_ENV}\nMARKET:{MARKET}\norderId:{orderId}"
+                )
         await asyncio.sleep(interval)
 
     async def sample(self, interval):
@@ -146,9 +163,4 @@ class Bot:
 
 if __name__ == "__main__":
 
-    try:
-        Bot(api_key=FTX_API_KEY, api_secret=FTX_API_SECRET)
-    except Exception as e:
-        print('An exception occurred', e)
-        push_message(e)
-        exit(1)
+    Bot(api_key=FTX_API_KEY, api_secret=FTX_API_SECRET)
