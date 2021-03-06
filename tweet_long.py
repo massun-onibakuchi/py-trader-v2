@@ -68,8 +68,8 @@ class Bot:
 
         await asyncio.sleep(5)
 
-        if position["size"] > float(self.MAX_POSITION_SIZE):
-            print("\n[Info]: MAX_ENTRY_SIZE")
+        if position["netSize"] > float(self.MAX_POSITION_SIZE):
+            print("\n[Info]: MAX_POSITION_SIZE")
         else:
             query = "query=from:elonmusk -is:retweet"
             tweet_fields = "tweet.fields=author_id"
@@ -87,7 +87,7 @@ class Bot:
                         market=MARKET,
                         side='buy',
                         price='',
-                        size=180,
+                        size=3800,
                         postOnly=False)
                 else:
                     self.ftx.place_order(
@@ -100,8 +100,8 @@ class Bot:
                 response = await self.ftx.send()
                 pprint(response[0])
                 orderId = response[0]['result']['id']
-                push_message(f"Ordered :\norderId:{orderId}")
-
+                push_message(
+                    f"[Order]{PYTHON_ENV}\nMARKET:{MARKET}\norderId:{orderId}")
         await asyncio.sleep(interval)
 
     async def sample(self, interval):

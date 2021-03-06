@@ -12,6 +12,26 @@ A python bot that trade a cryptocurrency based on some strategies.
  - `twitter`
    twitter recent reseach
 
+## How to install
+MacOSX/Linux
+
+To install Poetry, run
+`curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python3`
+
+`source $HOME/.poetry/env`
+
+And then, `poetry -V`
+
+If fail,run
+`apt-get install python3-venv`
+
+To install dependencies,
+
+`poetry install `
+
+To run the bot,  
+` poetry run python file.py`
+
 ## How to use
 Prepare `.production.env` beforehand,and then run
 `python3 file.py`
@@ -21,13 +41,3 @@ To make the bot reboot automatically when it crashes due to errors, use the fore
 chmod +x forever.py
 ./forever.py file.py
 ```
-If you use `poetry` ,run
-` poetry run python file.py`
-
-## How to install
-To install Poetry, run
-MaxOSX/Linux
-`curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python3`
-`source $HOME/.poetry/env`
-
-If fail,run this `apt-get install python3-venv`

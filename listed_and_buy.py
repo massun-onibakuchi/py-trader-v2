@@ -9,7 +9,7 @@ import json
 class Bot:
     DEFAULT_USD_SIZE = 100.0
     SPECIFIC_NAME = ["SPACEX", "STARLINK", "STAR", "STRLK"]
-    SPECIFIC_USD_SIZE = 900.0
+    SPECIFIC_USD_SIZE = 1500.0
     prev_markets: List[Dict[str, Union[str, float]]] = []
 
     def __init__(self, api_key, api_secret):
