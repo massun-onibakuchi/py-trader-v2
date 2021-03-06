@@ -6,9 +6,9 @@ from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
 from pprint import pprint
 
-MAX_SIZE = float(config["MAX_SIZE"])
-MARKET = config["MARKET"]
 BOT_NAME = config["BOT_NAME"]
+MARKET = config["MARKET"]
+MAX_SIZE = float(config["MAX_SIZE"])
 TRADABLE = config.getboolean('TRADABLE')
 
 
