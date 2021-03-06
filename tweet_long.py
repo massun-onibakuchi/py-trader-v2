@@ -3,8 +3,13 @@ from datetime import datetime, timezone, timedelta
 from ftx.ftx import FTX
 from twitter.recent_research import recent_research
 from line import push_message
-from setting.settting import FTX_API_KEY, FTX_API_SECRET, PYTHON_ENV, MARKET, SUBACCOUNT, MAX_SIZE, BOT_NAME
+from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
 from pprint import pprint
+
+MAX_SIZE = float(config["MAX_SIZE"])
+MARKET = config["MARKET"]
+BOT_NAME = config["BOT_NAME"]
+TRADABLE = config.getboolean('TRADABLE')
 
 
 class Bot:
@@ -93,71 +98,33 @@ class Bot:
 
             if len(result) > 0:
                 push_message(f"Detect events:\nkeywords:{keywords}\n{result}")
-                if PYTHON_ENV == 'production':
-                    self.ftx.place_order(
-                        type='market',
-                        market=MARKET,
-                        side='buy',
-                        price='',
-                        size=3800,
-                        postOnly=False)
-                else:
-                    self.ftx.place_order(
-                        type='limit',
-                        market=MARKET,
-                        side='buy',
-                        price=1111,
-                        size=0.001,
-                        postOnly=True)
-                response = await self.ftx.send()
-                pprint(response[0])
-                orderId = response[0]['result']['id']
-                self.order_list.append({
-                    "timestamp": datetime.now(timezone.utc),
-                    "orderId": orderId
-                })
-                push_message(
-                    f"[Order]{PYTHON_ENV}\nMARKET:{MARKET}\norderId:{orderId}"
-                )
-        await asyncio.sleep(interval)
-
-    async def sample(self, interval):
-        self.ftx.positions()
-        response = await self.ftx.send()
-        position = {}
-        for pos in response[0]["result"]:
-            if pos["future"] == MARKET:
-                position = pos
-        print("POSITION :>>")
-        pprint(position)
-
-        await asyncio.sleep(5)
-
-        if position["size"] > float(self.MAX_POSITION_SIZE):
-            print("[Info]: MAX_ENTRY_SIZE")
-
-        query = "query=from:elonmusk -is:retweet"
-        tweet_fields = "tweet.fields=author_id"
-        start_time_fields = self.create_time_fields(sec=10)
-        queries = [query, tweet_fields, start_time_fields]
-        keywords = ['doge', 'Doge', 'DOGE']
-
-        result = recent_research(keywords, queries)
-
-        if len(result) > 0:
-            push_message(f"Detect events:\nkeywords:{keywords}\n{result}")
-            self.ftx.place_order(
-                type='limit',
-                market=MARKET,
-                side='buy',
-                price=1111,
-                size=0.001,
-                postOnly=True)
-            response = await self.ftx.send()
-            pprint(response[0])
-            orderId = response[0]['result']['id']
-            push_message(f"Ordered :\norderId:{orderId}")
-
+                if TRADABLE:
+                    if PYTHON_ENV == 'production':
+                        self.ftx.place_order(
+                            type='market',
+                            market=MARKET,
+                            side='buy',
+                            price='',
+                            size=3800,
+                            postOnly=False)
+                    else:
+                        self.ftx.place_order(
+                            type='limit',
+                            market=MARKET,
+                            side='buy',
+                            price=1111,
+                            size=0.001,
+                            postOnly=True)
+                    response = await self.ftx.send()
+                    pprint(response[0])
+                    orderId = response[0]['result']['id']
+                    self.order_list.append({
+                        "timestamp": datetime.now(timezone.utc),
+                        "orderId": orderId
+                    })
+                    push_message(
+                        f"[Order]{PYTHON_ENV}\nMARKET:{MARKET}\norderId:{orderId}"
+                    )
         await asyncio.sleep(interval)
 
 
