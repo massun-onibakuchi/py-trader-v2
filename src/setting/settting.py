@@ -13,7 +13,7 @@ API_PREFIX = ""
 key_name = "FTX_API_KEY"
 secret_name = "FTX_API_SECRET"
 config = configparser.ConfigParser()
-conf_path = f"./setting/{os.path.basename(argv[0])}".replace('.py', '.ini')
+conf_path = f"./src/setting/{os.path.basename(argv[0])}".replace('.py', '.ini')
 try:
     if not os.path.isfile(conf_path):
         raise FileNotFoundError
@@ -42,6 +42,10 @@ TWITTER_BEARER_TOKEN = os.environ.get("TWITTER_BEARER_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
 LINE_BEARER_TOKEN = os.environ.get("LINE_BEARER_TOKEN")
 
-
-if FTX_API_KEY is None or FTX_API_SECRET is None:
-    raise ValueError(FTX_API_KEY, FTX_API_SECRET, "API_KEY_OR_API_SECRET_ARE_NONE")
+print("PYTHON_ENV :>>\n", PYTHON_ENV)
+try:
+    if FTX_API_KEY is None or FTX_API_SECRET is None:
+        raise ValueError(FTX_API_KEY, FTX_API_SECRET, "API_KEY_OR_API_SECRET_ARE_NONE")
+except ValueError as e:
+    print("e :>>", e)
+    exit(1)
