@@ -24,7 +24,7 @@ class Bot:
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
 
-        print(f"ENV:{PYTHON_ENV}\nSUBACCOUNT:{SUBACCOUNT}")
+        print(f"PYTHON_ENV:{PYTHON_ENV}\nSUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run()]
