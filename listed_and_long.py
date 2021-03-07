@@ -70,7 +70,8 @@ class Bot:
                 # SNS通知
                 push_message(f"NEW LISTED:\n {json.dumps(new)}")
 
-                usd = self.SPECIFIC_USD_SIZE if new["baseCurrency"] in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
+                usd = self.SPECIFIC_USD_SIZE if str(
+                    new["baseCurrency"]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
                 size = usd / float(new["bid"])
                 await asyncio.sleep(0)
 
