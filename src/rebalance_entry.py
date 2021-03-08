@@ -11,7 +11,6 @@ TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
 MARKET = config["MARKET"]
 VERBOSE = config.getboolean("VERBOSE")
-SINGLE = config.getboolean("SINGLE")
 
 
 class Color(IntEnum):
@@ -28,11 +27,8 @@ class Color(IntEnum):
 
 
 class Bot:
-    DEFAULT_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
     FRONTRUN_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
-    PLACE_MISS_PRICE_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
-    SPECIFIC_NAMES = config['SPECIFIC_NAMES']
-    SPECIFIC_USD_SIZE = float(config['SPECIFIC_USD_SIZE'])
+    CATCH_MISS_PRICE_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
 
     def __init__(self, api_key, api_secret):
         self.ftx = FTX(
@@ -62,8 +58,19 @@ class Bot:
                 exit(1)
 
     async def main(self, interval):
-        # main処理
-        # position確認
+        """
+         - positionを取ってくる
+         - futureからデータとる
+        if hour minが01-03ではないとき
+            if positionがあるなら，決済
+            if 閾値に達したなら....
+        else:
+            if 01 and 十分な価格変化:
+                成り行き
+                catch_miss_price
+            if 03 あたり:
+                if positionあるなら，決済
+        """
         position = {}
         self.ftx.positions()
         response = await self.ftx.send()
@@ -74,47 +81,55 @@ class Bot:
         print("\nPOSITION :>>")
         pprint(position)
 
-        self.phase = self.update(self.phase, position)
+        self.ftx.future()
+        response = await self.ftx.send()
 
-        # perps = []
-        if self.phase == 'fetch':
-            self.ftx.future()
-            response = await self.ftx.send()
-            perps = self.extract_markets(
-                markets=[response[0]['result']],
-                market_type=["perpetual"],
-                exclude_keywords=["BTC", "ETH", "XRP"],
-            )
-            perps = self.extract_change_bod(perps, grater_than=0.03)
-            if VERBOSE:
-                pprint.pprint(perps)
-            if len(perps[0]) > 0:
-                self.phase = 'frontrun'
-                self.perp = perps[0]
-            return await asyncio.sleep(5)
+        utc_date = datetime.now(timezone.utc)
+        hour = utc_date.hour
+        min = utc_date.minute
+        if hour == 0 and min >= 1 and min <= 3:
+            perps = self.extract_change_bod([response[0]["result"]], floor_bod=0.03)
+            pprint(perps)
+            perp = perps[0]
+            if min == 1:
+                # positionを持っているならば，
+                if abs(position["size"]):
+                    return
+                # positionを持っていなくて，bodが基準値以上ならば
+                # bod>0ならば，perpを買い増しリバランスなのでtakerで順方向エントリー
+                side = 'buy' if perp["changeBod"] > 0 else 'sell'
+                size = self.FRONTRUN_USD_SIZE / float(perp["bid"])
+                await self.taker_frontrun(MARKET, side, size)
 
-        side, size = self.order_conf(self.phase, self.perp)
-        if self.phase == 'frontrun':
-            success = await self.frontrun(market=MARKET, side=side, size=size, ord_type='market')
-            if success:
-                self.phase = 'prepare_miss_price'
-            await asyncio.sleep(5)
+                await asyncio.sleep(10)
+                # miss priceを狙って逆張りの指値
+                price = float(perp["bid"]) * 1.004
+                inverse_side = 'buy' if perp["changeBod"] < 0 else 'sell'
+                size = self.CATCH_MISS_PRICE_USD_SIZE / float(perp["bid"])
+                await self.maker_frontrun(MARKET, price, inverse_side, size,)
 
-        if self.phase == 'prepare_miss_price':
-            success = await self.catch_miss_price(market=MARKET, side=side, size=size)
-            if success:
-                self.phase = 'settle'
-            await asyncio.sleep(5)
+                await asyncio.sleep(interval)
+            if min == 3:
+                if abs(position["size"]) > 0:
+                    side = 'buy' if position["size"] < 0 else 'sell'
+                    size = abs(position["size"])
+                    self.ftx.place_order(MARKET, side, 'market', size)
+                    response = await self.ftx.send()
+                    print(response[0]["result"])
+        else:
+            # if hour minが01-03ではないとき
+            # positionがあるなら決済
+            if abs(position["size"]) > 0:
+                side = 'buy' if position["size"] < 0 else 'sell'
+                size = abs(position["size"])
+                self.ftx.place_order(MARKET, side, 'market', size)
+                await self.ftx.send()
+                print(response[0]["result"])
 
-        if self.phase == 'settle':
-            success = await self.catch_miss_price(market=MARKET, side=side, size=size)
-            if success:
-                self.phase = 'waiting'
-                self.perp = {}
-            await asyncio.sleep(5)
-
-        # ---------共通の処理----------
-        await asyncio.sleep(interval)
+            perps = self.extract_change_bod([response[0]["result"]], floor_bod=0.03)
+            # if リバランスの閾値に達しているなら...
+            if len(perps) > 0:
+                pass
 
         await asyncio.sleep(0)
 
@@ -152,68 +167,54 @@ class Bot:
                     satsfied.append(market)
         return satsfied
 
-    def extract_change_bod(self, markets, grater_than=0.03, smaller_than=0.0):
+    def extract_change_bod(
+            self,
+            markets,
+            floor_bod=0.0,
+            grater_than=0.0,
+            smaller_than=0.0):
         satsfied = []
-        for market in markets:
-            if grater_than <= abs(market["changeBod"]):
-                satsfied.append(market)
+        if floor_bod > 0:
+            for market in markets:
+                if floor_bod <= abs(market["changeBod"]):
+                    satsfied.append(market)
+            return satsfied
+        if grater_than > 0 and smaller_than < 0:
+            for market in markets:
+                if grater_than <= market["changeBod"]:
+                    satsfied.append(market)
+                if smaller_than >= market["changeBod"]:
+                    satsfied.append(market)
         return satsfied
 
-    async def frontrun(self, market, side, size, ord_type='limit'):
+    async def _entry(self, market, side, price, size, ord_type='limit', postOnly=False):
         if PYTHON_ENV == 'production':
             self.ftx.place_order(
                 type=ord_type,
                 market=market,
                 side=side,
-                price='',
+                price=price,
                 size=size,
-                postOnly=False)
+                postOnly=postOnly)
         else:
             self.ftx.place_order(
                 type=ord_type,
                 market=market,
                 side=side,
-                price=1000,
+                price=price,
                 size=size,
-                postOnly=False)
+                postOnly=True)
         response = await self.ftx.send()
         print(f"ENV:{PYTHON_ENV}\nMARKET:{market}\nSIZE:{size}\nSIDE:{side}")
         print(response[0])
         push_message(
             f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\nMARKET:{market}\nSIZE:{size}\nSIDE:{side}")
 
-    async def catch_miss_price(self, market, side, size):
-        return await self.frontrun(market, side, size, 'limit')
+    async def taker_frontrun(self, market, side, size):
+        await self._entry(market, side, '', size, 'market', False)
 
-    def update(self, phase, position):
-        utc_date = datetime.now(timezone.utc)
-        hour = utc_date.hour
-        min = utc_date.min
-        if hour == 0 and min == 1 and phase == 'wait':
-            return 'fetch'
-        if hour == 0 and min == 1 and phase == 'fetch':
-            return 'frontrun'
-        if hour == 0 and min == 3 and abs(position["size"]) > 0:
-            return 'settle'
-        else:
-            return 'waiting'
-
-    def order_conf(self, phase, perp):
-        side = ''
-        size = 0.0
-        if phase == 'fetch':
-            side = ''
-            size = 0.0
-        if phase == 'frontrun':
-            side = 'buy' if perp["changeBod"] > 0 else 'sell'
-            size = self.FRONTRUN_USD_SIZE / float(perp["bid"])
-        if phase == 'prepare_miss_price':
-            side = 'sell' if perp["changeBod"] < 0 else 'buy'  # inverse_side
-            size = self.PLACE_MISS_PRICE_USD_SIZE / float(perp["bid"])
-        if phase == 'settle':
-            side = 'sell' if perp["changeBod"] < 0 else 'buy'  # inverse_side
-            size = - perp['size']
-        return side, size
+    async def maker_frontrun(self, market, price, side, size):
+        await self._entry(market, side, price, size, 'limit', True)
 
 
 if __name__ == "__main__":
