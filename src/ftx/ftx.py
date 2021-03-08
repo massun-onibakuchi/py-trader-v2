@@ -15,7 +15,7 @@ class FTX:
     # 定数
     TIMEOUT = 3600  # タイムアウト
     EXTEND_TOKEN_TIME = 3000  # アクセストークン延長までの時間
-    MARKET = "BTC-PERP"  # 銘柄
+    # MARKET = "BTC-PERP"  # 銘柄
     URLS = {
         "REST": "https://ftx.com/api",
         "WebSocket": "wss://ftx.com/ws/",

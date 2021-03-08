@@ -5,11 +5,13 @@ from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
 from pprint import pprint
+from datetime import timezone, datetime
 
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
 MARKET = config["MARKET"]
 VERBOSE = config.getboolean("VERBOSE")
+SINGLE = config.getboolean("SINGLE")
 
 
 class Color(IntEnum):
@@ -27,12 +29,14 @@ class Color(IntEnum):
 
 class Bot:
     DEFAULT_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
+    FRONTRUN_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
+    PLACE_MISS_PRICE_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
     SPECIFIC_NAMES = config['SPECIFIC_NAMES']
     SPECIFIC_USD_SIZE = float(config['SPECIFIC_USD_SIZE'])
 
     def __init__(self, api_key, api_secret):
         self.ftx = FTX(
-            "",
+            market=MARKET,
             api_key=api_key,
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
@@ -60,54 +64,54 @@ class Bot:
     async def main(self, interval):
         # main処理
         # position確認
+        position = {}
         self.ftx.positions()
         response = await self.ftx.send()
-        if len(response[0]["result"]) > 0:
-            self.phase = 'position'
+        for pos in response[0]["result"]:
+            if pos["future"] == MARKET:
+                position = pos
+                break
+        print("\nPOSITION :>>")
+        pprint(position)
 
-        # marketが決まってないなら，futuresを叩く. 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
-        # こっちを採用 marketが決まっているなら,feturestatsを叩く
-        self.ftx.futures()
-        response = await self.ftx.send()
-        perpetual_markets = self.extract_markets(
-            markets=response[0]['result'],
-            market_type=["perpetual"],
-            exclude_keywords=["BTC", "ETH", "XRP"],
-        )
-        if VERBOSE:
-            pprint.pprint(perpetual_markets)
-        # 新規上場銘柄を抽出する
-        perpetuals = self.extract_change_bod(perpetual_markets, grater_than=0.03)
+        self.phase = self.update(self.phase, position)
 
-        for new in perpetuals:
-            usd = self.SPECIFIC_USD_SIZE if str(new["baseCurrency"]).upper(
-            ) in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
-            size = usd / float(new["bid"])
-            await asyncio.sleep(0)
+        # perps = []
+        if self.phase == 'fetch':
+            self.ftx.future()
+            response = await self.ftx.send()
+            perps = self.extract_markets(
+                markets=[response[0]['result']],
+                market_type=["perpetual"],
+                exclude_keywords=["BTC", "ETH", "XRP"],
+            )
+            perps = self.extract_change_bod(perps, grater_than=0.03)
+            if VERBOSE:
+                pprint.pprint(perps)
+            if len(perps[0]) > 0:
+                self.phase = 'frontrun'
+                self.perp = perps[0]
+            return await asyncio.sleep(5)
 
-            if TRADABLE:
-                if PYTHON_ENV == 'production':
-                    self.ftx.place_order(
-                        type='market',
-                        market=new["name"],
-                        side='buy',
-                        price='',
-                        size=size,
-                        postOnly=False)
-                else:
-                    self.ftx.place_order(
-                        type='limit',
-                        market='ETH-PERP',
-                        side='buy',
-                        price=1000,
-                        size=size,
-                        postOnly=False)
-                response = await self.ftx.send()
-                print(response[0])
-                orderId = response[0]['result']['id']
-                push_message(
-                    f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered :\norderId:{orderId}\n{new['name']}\nSIZE:{size}")
-                print(f"ENV:{PYTHON_ENV}\nMARKET:{new['name']}\nSIZE:{size}")
+        side, size = self.order_conf(self.phase, self.perp)
+        if self.phase == 'frontrun':
+            success = await self.frontrun(market=MARKET, side=side, size=size, ord_type='market')
+            if success:
+                self.phase = 'prepare_miss_price'
+            await asyncio.sleep(5)
+
+        if self.phase == 'prepare_miss_price':
+            success = await self.catch_miss_price(market=MARKET, side=side, size=size)
+            if success:
+                self.phase = 'settle'
+            await asyncio.sleep(5)
+
+        if self.phase == 'settle':
+            success = await self.catch_miss_price(market=MARKET, side=side, size=size)
+            if success:
+                self.phase = 'waiting'
+                self.perp = {}
+            await asyncio.sleep(5)
 
         # ---------共通の処理----------
         await asyncio.sleep(interval)
@@ -148,25 +152,68 @@ class Bot:
                     satsfied.append(market)
         return satsfied
 
-    def extract_change_bod(self, markets, grater_than=0.03):
+    def extract_change_bod(self, markets, grater_than=0.03, smaller_than=0.0):
         satsfied = []
         for market in markets:
             if grater_than <= abs(market["changeBod"]):
                 satsfied.append(market)
         return satsfied
 
-    def extract_new_listed(
-            self,
-            prev_markets: List[Dict[str, Union[str, float]]],
-            current_markets: List[Dict[str, Union[str, float]]]) -> List[Dict[str, Union[str, float]]]:
-        new_listed = []
-        if len(current_markets) == 0:
-            return new_listed
-        prev_market_names = [prev_market["name"] for prev_market in prev_markets]
-        for current_market in current_markets:
-            if current_market["name"] not in prev_market_names:
-                new_listed.append(current_market)
-        return new_listed
+    async def frontrun(self, market, side, size, ord_type='limit'):
+        if PYTHON_ENV == 'production':
+            self.ftx.place_order(
+                type=ord_type,
+                market=market,
+                side=side,
+                price='',
+                size=size,
+                postOnly=False)
+        else:
+            self.ftx.place_order(
+                type=ord_type,
+                market=market,
+                side=side,
+                price=1000,
+                size=size,
+                postOnly=False)
+        response = await self.ftx.send()
+        print(f"ENV:{PYTHON_ENV}\nMARKET:{market}\nSIZE:{size}\nSIDE:{side}")
+        print(response[0])
+        push_message(
+            f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\nMARKET:{market}\nSIZE:{size}\nSIDE:{side}")
+
+    async def catch_miss_price(self, market, side, size):
+        return await self.frontrun(market, side, size, 'limit')
+
+    def update(self, phase, position):
+        utc_date = datetime.now(timezone.utc)
+        hour = utc_date.hour
+        min = utc_date.min
+        if hour == 0 and min == 1 and phase == 'wait':
+            return 'fetch'
+        if hour == 0 and min == 1 and phase == 'fetch':
+            return 'frontrun'
+        if hour == 0 and min == 3 and abs(position["size"]) > 0:
+            return 'settle'
+        else:
+            return 'waiting'
+
+    def order_conf(self, phase, perp):
+        side = ''
+        size = 0.0
+        if phase == 'fetch':
+            side = ''
+            size = 0.0
+        if phase == 'frontrun':
+            side = 'buy' if perp["changeBod"] > 0 else 'sell'
+            size = self.FRONTRUN_USD_SIZE / float(perp["bid"])
+        if phase == 'prepare_miss_price':
+            side = 'sell' if perp["changeBod"] < 0 else 'buy'  # inverse_side
+            size = self.PLACE_MISS_PRICE_USD_SIZE / float(perp["bid"])
+        if phase == 'settle':
+            side = 'sell' if perp["changeBod"] < 0 else 'buy'  # inverse_side
+            size = - perp['size']
+        return side, size
 
 
 if __name__ == "__main__":
