@@ -14,12 +14,12 @@ TRADABLE = config.getboolean('TRADABLE')
 
 class Bot:
     MAX_POSITION_SIZE: float = 0.0
-    order_list = []
     # ---------------------------------------- #
     # init
     # ---------------------------------------- #
 
     def __init__(self, api_key, api_secret):
+        self.order_list = []
         if MAX_SIZE is not None:
             self.MAX_POSITION_SIZE = float(MAX_SIZE)
         else:

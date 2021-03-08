@@ -15,15 +15,13 @@ class Bot:
     SPECIFIC_NAMES = config['SPECIFIC_NAMES']
     SPECIFIC_USD_SIZE = float(config['SPECIFIC_USD_SIZE'])
 
-    prev_markets: List[Dict[str, Union[str, float]]] = []
-
     def __init__(self, api_key, api_secret):
         self.ftx = FTX(
             "",
             api_key=api_key,
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
-
+        self.prev_markets: List[Dict[str, Union[str, float]]] = []
         print(
             "BOT_NAME:%s\nENV:%s\nSUBACCOUNT:%s"
             % (BOT_NAME,

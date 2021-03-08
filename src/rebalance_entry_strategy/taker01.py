@@ -8,7 +8,6 @@ from pprint import pprint
 
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
-MARKET = config["MARKET"]
 VERBOSE = config.getboolean("VERBOSE")
 
 
@@ -30,15 +29,11 @@ class Bot:
     SPECIFIC_NAMES = config['SPECIFIC_NAMES']
     SPECIFIC_USD_SIZE = float(config['SPECIFIC_USD_SIZE'])
 
-    def __init__(self, api_key, api_secret):
-        self.ftx = FTX(
-            "",
-            api_key=api_key,
-            api_secret=api_secret,
-            subaccount=SUBACCOUNT)
-        self.prev_markets: List[Dict[str, Union[str, float]]] = []
-
+    def __init__(self, ftx, market):
         print(f"ENV:{PYTHON_ENV}\nSUBACCOUNT:{SUBACCOUNT}")
+        self.prev_markets: List[Dict[str, Union[str, float]]] = []
+        self.ftx = ftx
+        self.market = market
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run()]
@@ -59,16 +54,16 @@ class Bot:
 
     async def main(self, interval):
         # main処理
-        # position確認
-        self.ftx.positions()
-        response = await self.ftx.send()
-        if len(response[0]["result"]) > 0:
-            self.phase = 'position'
 
-        # marketが決まってないなら，futuresを叩く. 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
-        # こっちを採用 marketが決まっているなら,feturestatsを叩く
+        # self.ftx.positions()
+        # response = await self.ftx.send()
+
+        # if len(response[0]["result"]) > 0:
+        #     self.phase = 'position'
+
         self.ftx.futures()
         response = await self.ftx.send()
+        # 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
         perpetual_markets = self.extract_markets(
             markets=response[0]['result'],
             market_type=["perpetual"],
