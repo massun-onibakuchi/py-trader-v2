@@ -13,8 +13,8 @@ VERBOSE = config.getboolean("VERBOSE")
 
 
 class Bot:
-    FRONTRUN_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
-    CATCH_MISS_PRICE_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
+    FRONTRUN_USD_SIZE = float(config['FRONTRUN_USD_SIZE'])
+    CATCH_MISS_PRICE_USD_SIZE = float(config['CATCH_MISS_PRICE_USD_SIZE'])
 
     def __init__(self, api_key, api_secret):
         self.ftx = FTX(
@@ -24,7 +24,7 @@ class Bot:
             subaccount=SUBACCOUNT)
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
 
-        print(f"ENV:{PYTHON_ENV}\nSUBACCOUNT:{SUBACCOUNT}")
+        print(f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nSUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run()]
@@ -36,11 +36,12 @@ class Bot:
     async def run(self):
         while True:
             try:
-                await self.main(5)
+                await self.main(15)
                 await asyncio.sleep(0)
             except Exception as e:
                 print('An exception occurred', e)
-                push_message(e)
+                push_message(
+                    f"ERROR\nBOT:{BOT_NAME}\nSUBACCOUNT:{SUBACCOUNT}")
                 exit(1)
 
     async def main(self, interval):
@@ -69,6 +70,8 @@ class Bot:
 
         self.ftx.future()
         response = await self.ftx.send()
+        print("\nfuture :>>")
+        pprint(response[0]["result"])
 
         utc_date = datetime.now(timezone.utc)
         hour = utc_date.hour
@@ -94,31 +97,20 @@ class Bot:
                 size = self.CATCH_MISS_PRICE_USD_SIZE / float(perp["bid"])
                 await self.maker_frontrun(MARKET, price, inverse_side, size)
 
-                await asyncio.sleep(interval)
-            if min == 3:
-                if abs(position["size"]) > 0:
-                    side = 'buy' if position["size"] < 0 else 'sell'
-                    size = abs(position["size"])
-                    self.ftx.place_order(MARKET, side, 'market', size)
-                    response = await self.ftx.send()
-                    print(response[0]["result"])
-                    await asyncio.sleep(5)
+                await asyncio.sleep(15)
         else:
             # if hour minが01-03ではないとき
             # positionがあるなら決済
-            perps = self.extract_change_bod(
-                [response[0]["result"]], grater_than=0.06, smaller_than=-0.11)
-            if abs(position["size"]) > 0:
-                side = 'buy' if position["size"] < 0 else 'sell'
-                size = abs(position["size"])
-                self.ftx.place_order(MARKET, side, 'market', size)
-                await self.ftx.send()
-                print(response[0]["result"])
-            # if リバランスの閾値に達しているなら...
-            elif len(perps) > 0:
-                perp = perps[0]
-                pass
-        await asyncio.sleep(0)
+            if position != {} and abs(position["size"]) > 0:
+                await self.taker_settle(MARKET, position["size"])
+            else:
+                # if リバランスの閾値に達しているなら...
+                perps = self.extract_change_bod(
+                    [response[0]["result"]], grater_than=0.06, smaller_than=-0.11)
+                if len(perps) > 0:
+                    perp = perps[0]
+                    pass
+            await asyncio.sleep(interval)
 
     def extract_markets(self, markets, market_type=["spot", "future", "move", "perpetual"], exclude_keywords=[
             "/HEDGE", "/BULL", "/BEAR", "/HALF", "BVOL"]) -> List[Dict[str, Union[str, float]]]:
@@ -192,16 +184,23 @@ class Bot:
                 size=size,
                 postOnly=True)
         response = await self.ftx.send()
-        print(f"ENV:{PYTHON_ENV}\nMARKET:{market}\nSIZE:{size}\nSIDE:{side}")
         print(response[0])
-        push_message(
-            f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\nMARKET:{market}\nSIZE:{size}\nSIDE:{side}")
+        msg = f"ENV: {PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\nMARKET: {market}\nSIZE: {size}\nSIDE: {side}"
+        push_message(msg)
 
     async def taker_frontrun(self, market, side, size):
         await self._entry(market, side, '', size, 'market', False)
 
     async def maker_frontrun(self, market, price, side, size):
         await self._entry(market, side, price, size, 'limit', True)
+
+    async def taker_settle(self, market, size):
+        side = 'buy' if size < 0 else 'sell'
+        size = abs(size)
+        self.ftx.place_order(market, side, 'market', size)
+        response = await self.ftx.send()
+        print(response[0]["result"])
+        return True
 
 
 if __name__ == "__main__":
