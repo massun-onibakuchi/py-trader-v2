@@ -1,3 +1,4 @@
+from typing import Any
 import aiohttp
 import asyncio
 import async_timeout
@@ -264,7 +265,7 @@ class FTX:
 
                 traceback.print_exc()
 
-    async def send(self):
+    async def send(self) -> Any:
         promises = [self.fetch(req) for req in self.requests]
         self.requests.clear()
         return await asyncio.gather(*promises)

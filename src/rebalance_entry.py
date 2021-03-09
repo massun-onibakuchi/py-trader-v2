@@ -1,6 +1,5 @@
 import asyncio
 from typing import Dict, List, Union
-from enum import IntEnum
 from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
@@ -11,19 +10,6 @@ TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
 MARKET = config["MARKET"]
 VERBOSE = config.getboolean("VERBOSE")
-
-
-class Color(IntEnum):
-    ETNTRY = 1
-    ORDER_AWAIT = 2
-    AWAIT = 3
-
-# 01分にtakeするクラス
-# 01分にcatchhigeのmake注文だすクラス
-# 03分にポジションを持っていたら，全ての新規ポジション増やす注文をキャンセルして01分の始値にtp指値か即take決済，
-# crontabで00:00に起動
-# main botクラスでchangebodでperpsをスクリーニングして，対象を決定
-# main botクラスはそれらを操作取り扱う
 
 
 class Bot:
@@ -59,17 +45,17 @@ class Bot:
 
     async def main(self, interval):
         """
-         - positionを取ってくる
-         - futureからデータとる
-        if hour minが01-03ではないとき
-            if positionがあるなら，決済
-            if 閾値に達したなら....
-        else:
+            - positionを取ってくる
+            - futureからデータとる
+        if hour ==0 and minが01-03であるとき:
             if 01 and 十分な価格変化:
                 成り行き
                 catch_miss_price
             if 03 あたり:
                 if positionあるなら，決済
+        else
+            if positionがあるなら，決済
+            if 閾値に達したなら....
         """
         position = {}
         self.ftx.positions()
@@ -106,7 +92,7 @@ class Bot:
                 price = float(perp["bid"]) * 1.004
                 inverse_side = 'buy' if perp["changeBod"] < 0 else 'sell'
                 size = self.CATCH_MISS_PRICE_USD_SIZE / float(perp["bid"])
-                await self.maker_frontrun(MARKET, price, inverse_side, size,)
+                await self.maker_frontrun(MARKET, price, inverse_side, size)
 
                 await asyncio.sleep(interval)
             if min == 3:
@@ -116,21 +102,22 @@ class Bot:
                     self.ftx.place_order(MARKET, side, 'market', size)
                     response = await self.ftx.send()
                     print(response[0]["result"])
+                    await asyncio.sleep(5)
         else:
             # if hour minが01-03ではないとき
             # positionがあるなら決済
+            perps = self.extract_change_bod(
+                [response[0]["result"]], grater_than=0.06, smaller_than=-0.11)
             if abs(position["size"]) > 0:
                 side = 'buy' if position["size"] < 0 else 'sell'
                 size = abs(position["size"])
                 self.ftx.place_order(MARKET, side, 'market', size)
                 await self.ftx.send()
                 print(response[0]["result"])
-
-            perps = self.extract_change_bod([response[0]["result"]], floor_bod=0.03)
             # if リバランスの閾値に達しているなら...
-            if len(perps) > 0:
+            elif len(perps) > 0:
+                perp = perps[0]
                 pass
-
         await asyncio.sleep(0)
 
     def extract_markets(self, markets, market_type=["spot", "future", "move", "perpetual"], exclude_keywords=[

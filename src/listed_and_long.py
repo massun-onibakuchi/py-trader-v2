@@ -4,10 +4,12 @@ from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
 import json
+from datetime import datetime as dt
 
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
 VERBOSE = config.getboolean("VERBOSE")
+HODL_TIME = config.getfloat('HODL_TIME')
 
 
 class Bot:
@@ -22,6 +24,7 @@ class Bot:
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
+        self.positions = []
         print(
             "BOT_NAME:%s\nENV:%s\nSUBACCOUNT:%s"
             % (BOT_NAME,
@@ -38,7 +41,7 @@ class Bot:
     async def run(self):
         while True:
             try:
-                await self.main(10)
+                await self.main(5)
                 await asyncio.sleep(0)
             except Exception as e:
                 print('An exception occurred', e)
@@ -71,35 +74,22 @@ class Bot:
             for new in new_listed:
                 # SNS通知
                 push_message(f"NEW LISTED:\n {json.dumps(new)}")
-
-                usd = self.SPECIFIC_USD_SIZE if str(
-                    new["baseCurrency"]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
-                size = usd / float(new["bid"])
                 await asyncio.sleep(0)
-
                 if TRADABLE:
-                    if PYTHON_ENV == 'production':
-                        self.ftx.place_order(
-                            type='market',
-                            market=new["name"],
-                            side='buy',
-                            price='',
-                            size=size,
-                            postOnly=False)
-                    else:
-                        self.ftx.place_order(
-                            type='limit',
-                            market='ETH-PERP',
-                            side='buy',
-                            price=1000,
-                            size=size,
-                            postOnly=False)
-                    response = await self.ftx.send()
-                    print(response[0])
-                    orderId = response[0]['result']['id']
-                    push_message(
-                        f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered :\norderId:{orderId}\n{new['name']}\nSIZE:{size}")
-                    print(f"ENV:{PYTHON_ENV}\nMARKET:{new['name']}\nSIZE:{size}")
+                    ord_type = 'market'
+                    market = new["name"]
+                    price = ''
+                    usd = self.SPECIFIC_USD_SIZE if str(
+                        new["baseCurrency"]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
+                    size = usd / float(new["bid"])
+                    if PYTHON_ENV != 'production':
+                        price = 1000
+                        market = 'ETH-PERP'
+                        size = 0.001
+                        ord_type = 'limit'
+                    responce, success = await self.entry(market, size, ord_type, 'buy', price)
+                    self.positions.append(
+                        {"timestamp": dt.now(), "market": market, "size": size, 'side': 'buy'})
 
         # ---------共通の処理----------
         await asyncio.sleep(interval)
@@ -108,8 +98,6 @@ class Bot:
         self.prev_markets = listed
         listed = []
         print("Snapshot markets...")
-
-        await asyncio.sleep(0)
 
     def extract_markets(
             self,
@@ -143,6 +131,47 @@ class Bot:
             if current_market["name"] not in prev_market_names:
                 new_listed.append(current_market)
         return new_listed
+
+    def order_obj(self, market, base_currency, price):
+        ord_type = 'market'
+        price = ''
+        usd = self.SPECIFIC_USD_SIZE if base_currency.upper(
+        ) in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
+        size = usd / float(price)
+        if PYTHON_ENV != 'production':
+            price = 1000
+            market = 'ETH-PERP'
+            size = 0.001
+            ord_type = 'limit'
+        return market, price, size, ord_type
+
+    async def entry(self, market, size, ord_type, side, price='', postOnly=False):
+
+        self.ftx.place_order(
+            type=ord_type,
+            market=market,
+            side=side,
+            price=price,
+            size=size,
+            postOnly=postOnly)
+        response = await self.ftx.send()
+        msg = f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\n{market}\nSIZE:{size}"
+        print(msg)
+        push_message(msg)
+        return response, True
+
+    async def settle(self, pos):
+        positions = []
+        for pos in self.positions:
+            if dt.now() - pos["timestamp"] >= HODL_TIME:
+                responsse, success = await self.entry(
+                    market=pos["market"],
+                    size=pos["size"],
+                    ord_type='market',
+                    side='sell')
+                if not success:
+                    positions.append(pos)
+        return positions
 
 
 if __name__ == "__main__":
