@@ -61,10 +61,11 @@ class Bot:
         # print(json.dumps(response[0]['result'], indent=2, sort_keys=False))
         # 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
         listed = self.extract_markets(
-            markets=response[0]['result'], include=[
-                "spot", "future"])
+            markets=response[0]['result'],
+            include=["spot", "future"],
+            exclude=['HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-'])
         if VERBOSE:
-            print(json.dumps(listed, indent=2, sort_keys=False))
+            pprint(listed)
         # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
         if len(self.prev_markets) > 0:
             # 新規上場銘柄を抽出する
@@ -80,6 +81,7 @@ class Bot:
                 # SNS通知
                 push_message(f"NEW LISTED:\n {json.dumps(new)}")
                 await asyncio.sleep(0)
+                # トレードを許可しているならば，エントリー
                 if TRADABLE:
                     ord_type = 'market'
                     market = new["name"]
