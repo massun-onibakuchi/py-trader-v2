@@ -9,7 +9,13 @@ from datetime import timezone, datetime
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
 MARKET = config["MARKET"]
+FLOOR_CHANGE_BOD = config.getfloat('FLOOR_CHANGE_BOD')
+DISTANCE_CHANGE = config.getfloat('DISTANCE_CHANGE')
 VERBOSE = config.getboolean("VERBOSE")
+
+
+def sign(x):
+    return (x > 0) - (x < 0)
 
 
 class Bot:
@@ -22,8 +28,7 @@ class Bot:
             api_key=api_key,
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
-        self.prev_markets: List[Dict[str, Union[str, float]]] = []
-
+        self.order_ids = []
         print(f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nSUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
@@ -53,7 +58,7 @@ class Bot:
                 成り行き
                 catch_miss_price
             if 03 あたり:
-                if positionあるなら，決済
+                01での指値を全キャンセル
         else
             if positionがあるなら，決済
             if 閾値に達したなら....
@@ -77,13 +82,14 @@ class Bot:
         hour = utc_date.hour
         min = utc_date.minute
         if hour == 0 and min >= 1 and min <= 3:
-            perps = self.extract_change_bod([response[0]["result"]], floor_bod=0.03)
+            if abs(position["size"]):
+                return
+            perps = self.extract_change_bod(
+                [response[0]["result"]], floor_bod=FLOOR_CHANGE_BOD)
             pprint(perps)
             perp = perps[0]
             if min == 1:
                 # positionを持っているならば，
-                if abs(position["size"]):
-                    return
                 # positionを持っていなくて，bodが基準値以上ならば
                 # bod>0ならば，perpを買い増しリバランスなのでtakerで順方向エントリー
                 side = 'buy' if perp["changeBod"] > 0 else 'sell'
@@ -92,12 +98,22 @@ class Bot:
 
                 await asyncio.sleep(10)
                 # miss priceを狙って逆張りの指値
-                price = float(perp["bid"]) * 1.004
+                change = DISTANCE_CHANGE * sign(perp["changeBod"])
+                price = float(perp["bid"]) * (1.0 + change)
                 inverse_side = 'buy' if perp["changeBod"] < 0 else 'sell'
                 size = self.CATCH_MISS_PRICE_USD_SIZE / float(perp["bid"])
-                await self.maker_frontrun(MARKET, price, inverse_side, size)
-
+                response, success = await self.maker_frontrun(MARKET, price, inverse_side, size)
+                if success:
+                    self.order_ids.append(response[0]["result"]["id"])
                 await asyncio.sleep(15)
+            if min == 3:
+                # 指値注文全キャンセル
+                for id in self.order_ids:
+                    self.ftx.cancel_order(id)
+                    response = await self.ftx.send()
+                    await asyncio.sleep(1)
+                    if response[0]["status"] == 200:
+                        self.order_ids.remove(id)
         else:
             # if hour minが01-03ではないとき
             # positionがあるなら決済
@@ -187,12 +203,13 @@ class Bot:
         print(response[0])
         msg = f"ENV: {PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\nMARKET: {market}\nSIZE: {size}\nSIDE: {side}"
         push_message(msg)
+        return response, True
 
     async def taker_frontrun(self, market, side, size):
-        await self._entry(market, side, '', size, 'market', False)
+        return await self._entry(market, side, '', size, 'market', False)
 
     async def maker_frontrun(self, market, price, side, size):
-        await self._entry(market, side, price, size, 'limit', True)
+        return await self._entry(market, side, price, size, 'limit', True)
 
     async def taker_settle(self, market, size):
         side = 'buy' if size < 0 else 'sell'

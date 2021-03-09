@@ -4,12 +4,14 @@ from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
 import json
+from pprint import pprint
 from datetime import datetime as dt
 
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
 VERBOSE = config.getboolean("VERBOSE")
 HODL_TIME = config.getfloat('HODL_TIME')
+TARGET_PRICE_CHANGE = config.getfloat('TARGET_PRICE_CHANGE')
 
 
 class Bot:
@@ -25,6 +27,7 @@ class Bot:
             subaccount=SUBACCOUNT)
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
         self.positions = []
+
         print(
             "BOT_NAME:%s\nENV:%s\nSUBACCOUNT:%s"
             % (BOT_NAME,
@@ -57,7 +60,9 @@ class Bot:
         response = await self.ftx.send()
         # print(json.dumps(response[0]['result'], indent=2, sort_keys=False))
         # 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
-        listed = self.extract_markets(markets=response[0]['result'], include=["spot"])
+        listed = self.extract_markets(
+            markets=response[0]['result'], include=[
+                "spot", "future"])
         if VERBOSE:
             print(json.dumps(listed, indent=2, sort_keys=False))
         # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
@@ -88,16 +93,20 @@ class Bot:
                         size = 0.001
                         ord_type = 'limit'
                     responce, success = await self.entry(market, size, ord_type, 'buy', price)
-                    self.positions.append(
-                        {"timestamp": dt.now(), "market": market, "size": size, 'side': 'buy'})
-
+                    self.positions.append({"timestamp": dt.now(),
+                                           "market": market,
+                                           "size": size,
+                                           'side': 'buy',
+                                           'price': responce[0]["result"]["price"]})
+        await self.settle(market_type=["future"])
         # ---------共通の処理----------
-        await asyncio.sleep(interval)
-
         # 最新の上場のリストを更新
         self.prev_markets = listed
         listed = []
+        print("Current positions :>>")
+        pprint(self.positions)
         print("Snapshot markets...")
+        await asyncio.sleep(interval)
 
     def extract_markets(
             self,
@@ -145,33 +154,42 @@ class Bot:
             ord_type = 'limit'
         return market, price, size, ord_type
 
-    async def entry(self, market, size, ord_type, side, price='', postOnly=False):
-
+    async def entry(self, market, size, ord_type, side, price='', postOnly=False, reduceOnly=False):
         self.ftx.place_order(
             type=ord_type,
             market=market,
             side=side,
             price=price,
             size=size,
-            postOnly=postOnly)
+            postOnly=postOnly,
+            reduceOnly=reduceOnly
+        )
         response = await self.ftx.send()
         msg = f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\n{market}\nSIZE:{size}"
         print(msg)
         push_message(msg)
         return response, True
 
-    async def settle(self, pos):
-        positions = []
+    async def settle(self, market_type=["future"]):
+        has_future = "future" in market_type
         for pos in self.positions:
-            if dt.now() - pos["timestamp"] >= HODL_TIME:
+            # if dt.now() - pos["timestamp"] <= HODL_TIME:
+            #     return
+            if has_future and "-PERP" in pos["market"]:
+                price = pos["price"] * (1 + TARGET_PRICE_CHANGE)
                 responsse, success = await self.entry(
                     market=pos["market"],
                     size=pos["size"],
-                    ord_type='market',
-                    side='sell')
-                if not success:
-                    positions.append(pos)
-        return positions
+                    ord_type='limit',
+                    price=price,
+                    side='sell',
+                    reduceOnly=True
+                )
+                if success:
+                    self.positions.remove(pos)
+        else:
+            print("NO_POSITION")
+        return True
 
 
 if __name__ == "__main__":

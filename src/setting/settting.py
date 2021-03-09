@@ -42,7 +42,6 @@ TWITTER_BEARER_TOKEN = os.environ.get("TWITTER_BEARER_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
 LINE_BEARER_TOKEN = os.environ.get("LINE_BEARER_TOKEN")
 
-print("PYTHON_ENV :>>\n", PYTHON_ENV)
 try:
     if FTX_API_KEY is None or FTX_API_SECRET is None:
         raise ValueError(FTX_API_KEY, FTX_API_SECRET, "API_KEY_OR_API_SECRET_ARE_NONE")
