@@ -8,7 +8,7 @@ PYTHON_ENV = os.environ.get("PYTHON_ENV")
 ENV_FILE = '.production.env' if PYTHON_ENV == 'production' else '.development.env'
 dotenv_path = os.path.join(os.getcwd(), ENV_FILE)
 load_dotenv(dotenv_path)
-print(".env path" + dotenv_path)
+print(".env path :>>" + dotenv_path)
 
 API_PREFIX = ""
 key_name = "FTX_API_KEY"

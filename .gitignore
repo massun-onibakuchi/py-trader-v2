@@ -6,6 +6,6 @@ bin
 **.env
 **.png
 **.pdf
-
+**.log
 **/__pycache__
 src/read-orderbook-py

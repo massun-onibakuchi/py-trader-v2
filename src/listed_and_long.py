@@ -3,9 +3,8 @@ from typing import Dict, List, Union
 from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
-import json
-from pprint import pprint
 from datetime import datetime as dt
+from logger import setup_logger
 
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
@@ -25,14 +24,11 @@ class Bot:
             api_key=api_key,
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
+        self.logger = setup_logger("log/listed_and_long.log")
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
         self.positions = []
 
-        print(
-            "BOT_NAME:%s\nENV:%s\nSUBACCOUNT:%s"
-            % (BOT_NAME,
-               PYTHON_ENV,
-                SUBACCOUNT))
+        self.logger.info(f"BOT:{BOT_NAME} ENV:{PYTHON_ENV} SUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run()]
@@ -47,7 +43,7 @@ class Bot:
                 await self.main(5)
                 await asyncio.sleep(0)
             except Exception as e:
-                print('An exception occurred', e)
+                self.logger.error('An exception occurred', e)
                 push_message(e)
                 exit(1)
 
@@ -61,25 +57,23 @@ class Bot:
         # print(json.dumps(response[0]['result'], indent=2, sort_keys=False))
         # 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
         listed = self.extract_markets(
-            markets=response[0]['result'], include=[
-                "spot", "future"], exclude=[
-                'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-', "MOVE"])
-        if VERBOSE:
-            pprint(listed)
+            markets=response[0]['result'],
+            include=["spot", "future"],
+            exclude=[
+                'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-', "MOVE"
+            ])
+        VERBOSE and self.logger.debug(listed)
         # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
         if len(self.prev_markets) > 0:
             # 新規上場銘柄を抽出する
             new_listed = self.extract_new_listed(self.prev_markets, listed)
-            print(
-                "\nNew Listed...",
-                json.dumps(
-                    new_listed,
-                    indent=2,
-                    sort_keys=False))
+            if len(new_listed) > 0:
+                self.logger.info("New Listing :>>")
+                self.logger.info(new_listed)
 
             for new in new_listed:
                 # SNS通知
-                push_message(f"NEW LISTED:\n {json.dumps(new)}")
+                push_message(f"NEW LISTING:\n {new['name']}")
                 await asyncio.sleep(0)
                 # トレードを許可しているならば，エントリー
                 if TRADABLE:
@@ -100,14 +94,15 @@ class Bot:
                                            "size": size,
                                            'side': 'buy',
                                            'price': responce[0]["result"]["price"]})
-        await self.settle(market_type=["future"])
         # ---------共通の処理----------
         # 最新の上場のリストを更新
         self.prev_markets = listed
         listed = []
-        print("Current positions :>>")
-        pprint(self.positions)
-        print("Snapshot markets...")
+        self.logger.debug("Snapshot markets...")
+        if len(self.positions) > 0:
+            self.logger.info("Current positions :>>")
+            self.logger.info(self.positions)
+            await self.settle(market_type=["future"])
         await asyncio.sleep(interval)
 
     def extract_markets(
@@ -168,7 +163,7 @@ class Bot:
         )
         response = await self.ftx.send()
         msg = f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\n{market}\nSIZE:{size}"
-        print(msg)
+        self.logger.info(msg)
         push_message(msg)
         return response, True
 
@@ -189,8 +184,6 @@ class Bot:
                 )
                 if success:
                     self.positions.remove(pos)
-        else:
-            print("NO_POSITION")
         return True
 
 
