@@ -1,9 +1,10 @@
 import asyncio
+from configparser import Error
 from typing import Dict, List, Union
+import time
 from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
-from datetime import datetime as dt
 from logger import setup_logger
 
 TRADABLE = config.getboolean('TRADABLE')
@@ -27,6 +28,7 @@ class Bot:
         self.logger = setup_logger("log/listed_and_long.log")
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
         self.positions = []
+        self.flag = False
 
         self.logger.info(f"BOT:{BOT_NAME} ENV:{PYTHON_ENV} SUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
@@ -42,9 +44,12 @@ class Bot:
             try:
                 await self.main(5)
                 await asyncio.sleep(0)
+            except KeyError as e:
+                push_message("KeyError: {}".format(e))
+                self.logger.error('An exception occurred', str(e))
             except Exception as e:
-                self.logger.error('An exception occurred', e)
-                push_message(e)
+                push_message(str(e))
+                self.logger.error('An exception occurred' + str(e))
                 exit(1)
 
     async def main(self, interval):
@@ -67,33 +72,32 @@ class Bot:
         if len(self.prev_markets) > 0:
             # 新規上場銘柄を抽出する
             new_listed = self.extract_new_listed(self.prev_markets, listed)
-            if len(new_listed) > 0:
-                self.logger.info("New Listing :>>")
-                self.logger.info(new_listed)
-
             for new in new_listed:
                 # SNS通知
-                push_message(f"NEW LISTING:\n {new['name']}")
+                msg = f"New Listing: {new['name']}"
+                self.logger.info(msg)
+                push_message(msg)
                 await asyncio.sleep(0)
                 # トレードを許可しているならば，エントリー
                 if TRADABLE:
                     ord_type = 'market'
-                    market = new["name"]
+                    market = new['name']
                     price = ''
+                    key = 'underlying' if new['type'] == 'future' else 'baseCurrency'
                     usd = self.SPECIFIC_USD_SIZE if str(
-                        new["baseCurrency"]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
-                    size = usd / float(new["bid"])
+                        new[key]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
+                    size = usd / (float(new['bid']) + float(new['ask'])) / 2
                     if PYTHON_ENV != 'production':
                         price = 1000
                         market = 'ETH-PERP'
                         size = 0.001
                         ord_type = 'limit'
-                    responce, success = await self.entry(market, size, ord_type, 'buy', price)
-                    self.positions.append({"timestamp": dt.now(),
-                                           "market": market,
-                                           "size": size,
+                    responce, _ = await self.entry(market, size, ord_type, 'buy', price)
+                    self.positions.append({'orderTime': time.time(),
+                                           'market': market,
+                                           'size': size,
                                            'side': 'buy',
-                                           'price': responce[0]["result"]["price"]})
+                                           'price': responce[0]['result']['price']})
         # ---------共通の処理----------
         # 最新の上場のリストを更新
         self.prev_markets = listed
@@ -109,7 +113,7 @@ class Bot:
             self,
             markets,
             include=["spot", "future"],
-            exclude=["HEDGE", "BULL", "BEAR", "HALF", "BVOL"]):
+            exclude=["HEDGE", "BULL", "BEAR", "HALF", "BVOL", "-0326"]):
         satsfied = []
         has_spot = "spot" in include
         has_future = "future" in include
@@ -138,53 +142,53 @@ class Bot:
                 new_listed.append(current_market)
         return new_listed
 
-    def order_obj(self, market, base_currency, price):
-        ord_type = 'market'
-        price = ''
-        usd = self.SPECIFIC_USD_SIZE if base_currency.upper(
-        ) in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
-        size = usd / float(price)
-        if PYTHON_ENV != 'production':
-            price = 1000
-            market = 'ETH-PERP'
-            size = 0.001
-            ord_type = 'limit'
-        return market, price, size, ord_type
-
-    async def entry(self, market, size, ord_type, side, price='', postOnly=False, reduceOnly=False):
-        self.ftx.place_order(
-            type=ord_type,
-            market=market,
-            side=side,
-            price=price,
-            size=size,
-            postOnly=postOnly,
-            reduceOnly=reduceOnly
-        )
-        response = await self.ftx.send()
-        msg = f"ENV:{PYTHON_ENV}\nBOT:{BOT_NAME}\nOrdered\n{market}\nSIZE:{size}"
-        self.logger.info(msg)
-        push_message(msg)
-        return response, True
+    async def entry(self, market, size, ord_type, side, price="", postOnly=False, reduceOnly=False):
+        try:
+            self.ftx.place_order(
+                type=ord_type,
+                market=market,
+                side=side,
+                price=price,
+                size=size,
+                postOnly=postOnly,
+                reduceOnly=reduceOnly
+            )
+            response = await self.ftx.send()
+            if response[0]['success']:
+                msg = f"BOT:{BOT_NAME}\nOrdered\n{market}\nSIZE:{size}"
+                self.logger.info(msg)
+                push_message(msg)
+                return response, True
+            else:
+                raise Exception(response[0])
+        except Exception as e:
+            msg = f"BOT:{BOT_NAME}\nERROR: {str(e)}"
+            self.logger.error(msg)
+            push_message(msg)
+            return {}, False
 
     async def settle(self, market_type=["future"]):
         has_future = "future" in market_type
         for pos in self.positions:
-            # if dt.now() - pos["timestamp"] <= HODL_TIME:
-            #     return
-            if has_future and "-PERP" in pos["market"]:
-                price = pos["price"] * (1 + TARGET_PRICE_CHANGE)
-                responsse, success = await self.entry(
-                    market=pos["market"],
-                    size=pos["size"],
-                    ord_type='limit',
-                    price=price,
-                    side='sell',
-                    reduceOnly=True
-                )
-                if success:
-                    self.positions.remove(pos)
-        return True
+            if has_future and ("-PERP" in pos["market"]):
+                try:
+                    if time.time() - pos["orderTime"] >= HODL_TIME:
+                        price = ""
+                        ord_type = 'market'
+                        _, success = await self.entry(
+                            market=pos["market"],
+                            size=pos["size"],
+                            ord_type=ord_type,
+                            price=price,
+                            side='sell',
+                            reduceOnly=True
+                        )
+                        if success:
+                            self.positions.remove(pos)
+                except KeyError as e:
+                    self.logger.error("KeyError" + str(e))
+                except Exception as e:
+                    self.logger.error("Exception: " + str(e))
 
 
 if __name__ == "__main__":

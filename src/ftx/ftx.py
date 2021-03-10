@@ -597,7 +597,7 @@ class FTX:
         params = {
             "market": market or self.MARKET,
             "side": side,
-            "price": price if len(str(price)) > 0 else null,
+            "price": price if len(str(price)) > 0 else None,
             "type": type,
             "size": size,
             "reduceOnly": reduceOnly,
