@@ -61,9 +61,9 @@ class Bot:
         # print(json.dumps(response[0]['result'], indent=2, sort_keys=False))
         # 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
         listed = self.extract_markets(
-            markets=response[0]['result'],
-            include=["spot", "future"],
-            exclude=['HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-'])
+            markets=response[0]['result'], include=[
+                "spot", "future"], exclude=[
+                'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-', "MOVE"])
         if VERBOSE:
             pprint(listed)
         # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
@@ -123,7 +123,7 @@ class Bot:
                 if has_spot and market['type'] == "spot" and market["quoteCurrency"] == 'USD':
                     is_excluded = True
                     for keyword in exclude:
-                        is_excluded = is_excluded and keyword not in market["baseCurrency"]
+                        is_excluded = is_excluded and keyword not in market["name"]
                     if is_excluded:
                         satsfied.append(market)
                 if has_future and market["type"] == 'future':
