@@ -74,7 +74,7 @@ class Bot:
 
         self.ftx.positions()
         response = await self.ftx.send()
-        # print(json.dumps(response[0], indent=2, sort_keys=False))
+        # pprint(response[0])
         position = {}
         for pos in response[0]["result"]:
             if pos["future"] == MARKET:
