@@ -3,7 +3,7 @@ import os
 
 
 def setup_logger(file_name, modname=__name__):
-    dir = os.path.dirname(filepath)
+    dir = os.path.dirname(file_name)
     if not os.path.isdir(dir):
         os.makedirs(dir)
 
