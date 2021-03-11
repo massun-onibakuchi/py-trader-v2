@@ -10,14 +10,12 @@ from logger import setup_logger
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
 VERBOSE = config.getboolean("VERBOSE")
-HODL_TIME = config.getfloat('HODL_TIME')
-TARGET_PRICE_CHANGE = config.getfloat('TARGET_PRICE_CHANGE')
 
 
 class Bot:
-    DEFAULT_USD_SIZE = float(config['DEFAULT_USD_SIZE'])
+    DEFAULT_USD_SIZE = config.getfloat('DEFAULT_USD_SIZE')
     SPECIFIC_NAMES = config['SPECIFIC_NAMES']
-    SPECIFIC_USD_SIZE = float(config['SPECIFIC_USD_SIZE'])
+    SPECIFIC_USD_SIZE = config.getfloat('SPECIFIC_USD_SIZE')
 
     def __init__(self, api_key, api_secret):
         self.ftx = FTX(
@@ -28,7 +26,8 @@ class Bot:
         self.logger = setup_logger("log/listed_and_long.log")
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
         self.positions = []
-        self.flag = False
+        self.HODL_TIME = config.getfloat('HODL_TIME')
+        self.TARGET_PRICE_CHANGE = config.getfloat('TARGET_PRICE_CHANGE')
 
         self.logger.info(f"BOT:{BOT_NAME} ENV:{PYTHON_ENV} SUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
@@ -172,7 +171,7 @@ class Bot:
         for pos in self.positions:
             if has_future and ("-PERP" in pos["market"]):
                 try:
-                    if time.time() - pos["orderTime"] >= HODL_TIME:
+                    if time.time() - pos["orderTime"] >= self.HODL_TIME:
                         price = ""
                         ord_type = 'market'
                         _, success = await self.entry(
