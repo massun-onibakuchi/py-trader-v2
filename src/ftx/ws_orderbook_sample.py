@@ -3,6 +3,8 @@ from ftx import FTX
 
 
 class Sample:
+    board_temp = []
+    board = {'asks': {}, 'bids': {}}
 
     # ---------------------------------------- #
     # init

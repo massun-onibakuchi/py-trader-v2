@@ -1,5 +1,4 @@
 import asyncio
-from configparser import Error
 from typing import Dict, List, Union
 import time
 from ftx.ftx import FTX
@@ -27,7 +26,6 @@ class Bot:
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
         self.positions = []
         self.HODL_TIME = config.getfloat('HODL_TIME')
-        self.TARGET_PRICE_CHANGE = config.getfloat('TARGET_PRICE_CHANGE')
 
         self.logger.info(f"BOT:{BOT_NAME} ENV:{PYTHON_ENV} SUBACCOUNT:{SUBACCOUNT}")
         # タスクの設定およびイベントループの開始
@@ -154,7 +152,7 @@ class Bot:
             )
             response = await self.ftx.send()
             if response[0]['success']:
-                msg = f"BOT:{BOT_NAME}\nOrdered\n{market}\nSIZE:{size}"
+                msg = f"BOT:{BOT_NAME}\nOrdered\n{market}\nSIDE:{side}\nSIZE:{size}"
                 self.logger.info(msg)
                 push_message(msg)
                 return response, True

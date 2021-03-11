@@ -1,16 +1,11 @@
 import asyncio
 from typing import Dict, Union, List, Any
 from ftx.ftx import FTX
-from line import push_message
-from setting.settting import PYTHON_ENV, config
+from setting.settting import PYTHON_ENV, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT
 import time
-from logger import setup_logger
 
-TRADABLE = config.getboolean('TRADABLE')
-BOT_NAME = config['BOT_NAME']
-MARKET = config['MARKET']
-VERBOSE = config.getboolean('VERBOSE')
-PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
+VERBOSE = True
+market = 'CBSE'
 
 
 class BotBase:
@@ -20,57 +15,39 @@ class BotBase:
             api_key=api_key,
             api_secret=api_secret,
             subaccount=subaccount)
-        self.logger = setup_logger(f'log/{BOT_NAME.lower()}.log')
         self.MARKET: str = _market
         self.MARKET_TYPE: str = market_type
         self.position: Dict[str, Any] = {}
         self.open_orders: List[Dict[str, Union[str, float]]] = []
 
-        self.logger.info(
-            f'BOT:{BOT_NAME} started... ENV:{PYTHON_ENV} SUBACCOUNT:{subaccount}')
         # タスクの設定およびイベントループの開始
-        # loop = asyncio.get_event_loop()
-        # tasks = [self.run()]
-        # loop.run_until_complete(asyncio.wait(tasks))
+        loop = asyncio.get_event_loop()
+        tasks = [self.run()]
+        loop.run_until_complete(asyncio.wait(tasks))
 
     # ---------------------------------------- #
     # bot main
     # ---------------------------------------- #
-    async def run(self, interval):
-        while True:
-            try:
-                await self.main(interval)
-                await asyncio.sleep(0)
-            except Exception as e:
-                self.logger.error(f'An exception occurred: {str(e)}')
-                push_message(str(e))
-                exit(1)
-
-    async def get_single_market(self):
+    async def run(self):
         try:
-            self.ftx.single_market()
-            res = await self.ftx.send()
-            if res[0]['success']:
-                return res[0]['result'], True
+            res, success = await self.get_markets()
+            if success:
+                print(res)
+                for market in res:
+                    if 'CBSE' in market['name']:
+                        print(market)
             else:
-                raise Exception('API_REQUEST_FAILED get_single_market', res[0])
+                print('fail')
+            await asyncio.sleep(0)
         except Exception as e:
             print(e)
-            return {}, False
+            exit(1)
 
-    async def get_markets(self):
-        try:
-            self.ftx.market()
-            res = await self.ftx.send()
-            if res[0]['success']:
-                return res[0]['result'], True
-            else:
-                raise Exception('API_REQUEST_FAILED', res[0])
-        except Exception as e:
-            self.logger.error(e)
-            return {}, False
-
-    async def place_order(self, side, ord_type, size, price='',
+    async def place_order(self,
+                          side,
+                          ord_type,
+                          size,
+                          price='',
                           ioc=False, reduceOnly=False, postOnly=False, sec_to_expire=0):
         try:
             self.ftx.place_order(
@@ -98,29 +75,23 @@ class BotBase:
                         'cancelTime': None,
                         'excutedSize': data['filledSize'],
                     })
-                self.logger.info(
-                    f'Place_order :>> orderId:{data["id"]},market:{self.MARKET},side:{data["side"]},price:{data["price"]}')
-                push_message(
-                    f'{BOT_NAME}:place_order\nmarket:{self.MARKET}\nside:{data["side"]}\nprice:{data["price"]}')
                 return data, True
             else:
                 raise Exception(f'PLACE_ORDER_FAILED:{res[0]["error"]}')
         except Exception as e:
-            self.logger.error(str(e))
+            print(e)
             return {}, False
 
     async def cancel_expired_orders(self, delay=1):
-        self.logger.debug('Cancel expired orders...')
         for order in self.open_orders:
             if (order['status'] in ['new', 'open']) and float(
                     order['expireTime']) > time.time() and order['cancelTime'] is None:
                 _, success = await self.cancel_order(order)
                 if not success:
-                    self.logger.error('CANCEL_EXPIRED_ORDERS: cancel_order failed')
+                    print('CANCEL_EXPIRED_ORDERS')
                 await asyncio.sleep(delay)
 
     async def update_orders_status(self, delay=1):
-        self.logger.debug('Updating orders status...')
         for order in self.open_orders:
             try:
                 if order['status'] in ['open', 'new'] and float(
@@ -134,7 +105,7 @@ class BotBase:
                         raise Exception('API_REQUEST_FAILED UPDATE_ORDERS_STATUS', res[0])
                     await asyncio.sleep(delay)
             except Exception as e:
-                self.logger.error(f'UPDATE_ORDERS_STATUS_FAILED {str(e)}')
+                print(e)
 
     def _update_order_status(self, data, order):
         try:
@@ -162,7 +133,6 @@ class BotBase:
             return self._update_open_order_by(order)
         except Exception as e:
             print(e)
-            self.logger.error(f'_update_open_order_status {str(e)}')
 
     async def cancel_order(self, order):
         try:
@@ -170,9 +140,6 @@ class BotBase:
             res = await self.ftx.send()
             if res[0]['success']:
                 data = res[0]['result']
-                self.logger.info(data)
-                self.logger.info(
-                    f'cancel_order request success :>> orderId:{order["orderId"]}')
                 order['cancelTime'] = time.time()
                 if not isinstance(data, Dict):
                     data = None
@@ -181,8 +148,6 @@ class BotBase:
             else:
                 raise Exception(f'API_REQUEST_FAILED orderId:{order["orderId"]}', res[0])
         except Exception as e:
-            self.logger.error(str(e))
-            push_message(str(e))
             return {}, False
 
     def _update_open_order_by(self, order):
@@ -201,13 +166,13 @@ class BotBase:
             elif order['status'] == 'open' or order['status'] == 'new':
                 pass
             else:
-                self.logger.warn(f'Unexpected Order status{order["status"]}')
+                print(f'Unexpected Order status{order["status"]}')
         except Exception as e:
-            self.logger.error(str(e))
+            print(e)
             raise Exception(f'UPDATE_OPEN_ORDER_BY_STATUS {str(e)}')
 
     def remove_not_open_orders(self):
-        self.logger.debug('Remove not open orders...')
+        print('Remove not open orders...')
         for order in self.open_orders:
             self._update_open_order_by(order)
 
@@ -221,7 +186,7 @@ class BotBase:
         except KeyError as e:
             raise KeyError('KeyError', order)
         except Exception as e:
-            self.logger.error(str(e))
+            print(e)
 
     async def get_position(self):
         self.ftx.positions()
@@ -240,30 +205,44 @@ class BotBase:
             print(e)
             return {}, False
 
+    async def get_single_market(self):
+        try:
+            self.ftx.single_market()
+            res = await self.ftx.send()
+            if res[0]['success']:
+                return res[0]['result'], True
+            else:
+                raise Exception('API_REQUEST_FAILED get_single_market', res[0])
+        except Exception as e:
+            print(e)
+            return {}, False
+
+    async def get_markets(self):
+        try:
+            self.ftx.market()
+            res = await self.ftx.send()
+            if res[0]['success']:
+                return res[0]['result'], True
+            else:
+                raise Exception('API_REQUEST_FAILED', res[0])
+        except Exception as e:
+            print(e)
+            return {}, False
+
     async def sync_position(self, delay=0):
-        self.logger.debug('Sync position...')
+        print('Sync position...')
         pos, success = await self.get_position()
         if success:
             self.position = pos
         else:
-            self.logger.error('Fail SyncPosition...')
+            print('Fail SyncPosition...')
         await asyncio.sleep(delay)
 
     def log_status(self):
         if VERBOSE:
-            # self.logger.debug(f'self.position :>> {self.position}')
-            self.logger.info(f'self.open_orders :>> {self.open_orders}')
+            # print(f'self.position :>> {self.position}')
+            print(f'self.open_orders :>> {self.open_orders}')
 
-    async def main(self, interval):
-        try:
-            await self.cancel_expired_orders(delay=1)
-            await self.update_orders_status(delay=1)
-            # self.remove_not_open_orders()
-            # if self.MARKET_TYPE.lower() == 'future':
-            #     await self.sync_position()
-            # elif self.MARKET_TYPE.lower() == 'spot':
-            #     pass
-            self.log_status()
-            await asyncio.sleep(interval)
-        except Exception as e:
-            self.logger.error(f'ERROR: {str(e)}')
+
+if __name__ == "__main__":
+    BotBase(market, 'future', FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT)
