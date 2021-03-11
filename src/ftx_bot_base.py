@@ -58,7 +58,7 @@ class BotBase:
             self.logger.error(e)
             return {}
 
-    async def place_order(self, side, ord_type, size, price='', reduceOnly=False, postOnly=False, sec_to_expire=0):
+    async def place_order(self, side, ord_type, size, price='', ioc=False, reduceOnly=False, postOnly=False, sec_to_expire=0):
         try:
             self.ftx.place_order(
                 self.MARKET,
@@ -66,23 +66,25 @@ class BotBase:
                 ord_type,
                 size,
                 price,
+                ioc,
                 reduceOnly,
                 postOnly)
             res = await self.ftx.send()
             if res[0]['success']:
                 data = res[0]['result']
-                self.open_orders.append({
-                    'orderId': data['id'],
-                    'side': data['side'],
-                    'type': data['type'],
-                    'size': data['size'],
-                    'price': data['price'],
-                    'status': data['status'],
-                    'orderTime': time.time(),
-                    'expireTime': time.time() + sec_to_expire,
-                    'cancelTime': None,
-                    'excutedSize': data['filledSize'],
-                })
+                if data['status'] != 'cancelled':
+                    self.open_orders.append({
+                        'orderId': data['id'],
+                        'side': data['side'],
+                        'type': data['type'],
+                        'size': data['size'],
+                        'price': data['price'],
+                        'status': data['status'],
+                        'orderTime': time.time(),
+                        'expireTime': time.time() + sec_to_expire,
+                        'cancelTime': None,
+                        'excutedSize': data['filledSize'],
+                    })
                 self.logger.info(
                     f'Place_order :>> orderId:{data["id"]},market:{self.MARKET},side:{data["side"]},price:{data["price"]}')
                 push_message(
@@ -95,9 +97,10 @@ class BotBase:
             return {}, False
 
     async def cancel_expired_orders(self, delay=1):
-        # self.logger.debug('Cancel expired orders...')
+        self.logger.debug('Cancel expired orders...')
         for order in self.open_orders:
-            if order['status'] in ['new', 'open'] and float(order['expireTime']) > time.time():
+            if (order['status'] in ['new', 'open']) and float(
+                    order['expireTime']) > time.time():
                 _, success = await self.cancel_order(order)
                 if not success:
                     self.logger.error('CANCEL_EXPIRED_ORDERS: cancel_order failed')
@@ -107,26 +110,35 @@ class BotBase:
         self.logger.debug('Updating orders status...')
         for order in self.open_orders:
             try:
-                if order['status'] == 'open' and float(order['expireTime']) < time.time():
+                if order['status'] in ['open', 'new'] and float(
+                        order['expireTime']) < time.time():
                     self.ftx.order_status(order['orderId'])
                     res = await self.ftx.send()
                     if res[0]['success']:
                         data = res[0]['result']
                         self._update_order_status(data, order)
                     else:
-                        raise Exception('UPDATE_ORDERS_STATUS_FAILED', res[0])
+                        raise Exception('API_REQUEST_FAILED UPDATE_ORDERS_STATUS', res[0])
                     await asyncio.sleep(delay)
             except Exception as e:
                 self.logger.error(f'UPDATE_ORDERS_STATUS_FAILED {str(e)}')
 
     def _update_order_status(self, data, order):
-        order['status'] = data['status']
-        order['excutedSize'] = data['filledSize']
-        if data['status'] == 'cancelled':
-            order['cancelTime'] = time.time()
-        elif data['status'] == 'closed':
-            self._update_position_by(order)
-        return self.remove_not_open_orders()
+        try:
+            order['status'] = data['status']
+            order['excutedSize'] = data['filledSize']
+            if order['status'] == 'cancelled':  # FTXではcancelledかfilledはclosedとして表わされる.
+                pass
+            elif order['status'] == 'closed' and order['cancelTime'] is not None:  # cancelされた注文はcancelTimeが数値になる
+                pass
+            elif order['status'] == 'closed' and order['cancelTime'] is None:
+                self._update_position_by(order)
+            elif order['status'] == 'filled' and order['cancelTime'] is None:
+                self._update_position_by(order)
+            return self._update_open_order_by_status(order)
+        except Exception as e:
+            print(e)
+            self.logger.error(f'_update_open_order_status {str(e)}')
 
     async def cancel_order(self, order):
         try:
@@ -134,8 +146,9 @@ class BotBase:
             res = await self.ftx.send()
             if res[0]['success']:
                 data = res[0]['result']
+                order['cancelTime'] = time.time()
                 self._update_order_status(data, order)
-                self.logger.debug(f'Order cancelled :>> orderId:{order["orderId"]}')
+                self.logger.info(f'Order cancelled :>> orderId:{order["orderId"]}')
                 return data, True
             else:
                 raise Exception(f'API_REQUEST_FAILED orderId:{order["orderId"]}', res[0])
@@ -144,17 +157,30 @@ class BotBase:
             push_message(str(e))
             return {}, False
 
-    def remove_not_open_orders(self):
-        self.logger.debug('Remove not open orders...')
-        for order in self.open_orders:
-            if order['status'] == 'closed':
-                self.open_orders.remove(order)
+    def _update_open_order_by_status(self, order):
+        try:
             if order['status'] == 'cancelled':
                 self.open_orders.remove(order)
-            if order['status'] == 'open' or order['status'] == 'new':
+            # cancelled
+            elif order['status'] == 'closed' and order['cancelTime'] is not None:
+                self.open_orders.remove(order)
+            # filled
+            elif order['status'] == 'closed' and order['cancelTime'] is None:
+                self.open_orders.remove(order)
+            elif order['status'] == 'filled' and order['cancelTime'] is None:
+                self.open_orders.remove(order)
+            elif order['status'] == 'open' or order['status'] == 'new':
                 pass
             else:
                 self.logger.warn(f'Unexpected Order status{order["status"]}')
+        except Exception as e:
+            self.logger.error(str(e))
+            raise Exception(f'UPDATE_OPEN_ORDER_BY_STATUS {str(e)}')
+
+    def remove_not_open_orders(self):
+        self.logger.debug('Remove not open orders...')
+        for order in self.open_orders:
+            self._update_open_order_by_status(order)
 
     def _update_position_by(self, order):
         try:

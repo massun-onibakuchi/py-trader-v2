@@ -1,5 +1,4 @@
 {
-    "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 1000,
     // ファイルの終了時に行末のスペース削除
     "files.trimTrailingWhitespace": true,
@@ -46,4 +45,5 @@
         "**/.mypy_cache/**": true,
     },
     "python.linting.enabled": true,
+    "files.autoSave": "afterDelay",
 }
