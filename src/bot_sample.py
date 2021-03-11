@@ -4,13 +4,13 @@ from setting.settting import PYTHON_ENV, config, FTX_API_KEY, FTX_API_SECRET, SU
 
 
 class Bot(BotBase):
-    def __init__(self, market, api_key, api_secret, subaccount):
-        super().__init__(market, api_key, api_secret, subaccount)
+    def __init__(self, market, market_type, api_key, api_secret, subaccount):
+        super().__init__(market, market_type, api_key, api_secret, subaccount)
         loop = asyncio.get_event_loop()
-        tasks = [self.run()]
+        tasks = [self.run_strategy()]
         loop.run_until_complete(asyncio.wait(tasks))
 
-    async def run(self):
+    async def run_strategy(self):
         while True:
             try:
                 await self.strategy(10)
@@ -20,14 +20,17 @@ class Bot(BotBase):
                 exit(1)
 
     async def strategy(self, interval):
-        _, success = await self.place_order('buy', 'limit', 0.001, 1000, False, True, 1000)
-        if success:
-            self.logger.debug('new order')
+        print('strategy')
+        await asyncio.sleep(interval)
+        # _, success = await self.place_order('buy', 'limit', 0.001, 1000, False, True, 1000)
+        # if success:
+        #     self.logger.debug('new order')
 
 
 MARKET = config['MARKET']
 BOT_NAME = config["BOT_NAME"]
 TRADABLE = config.getboolean('TRADABLE')
 VERBOSE = config.getboolean("VERBOSE")
+MARKET_TYPE = config["MARKET_TYPE"]
 
-bot = Bot(MARKET, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT)
+bot = Bot(MARKET, MARKET_TYPE, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT)
