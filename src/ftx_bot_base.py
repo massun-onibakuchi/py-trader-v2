@@ -100,7 +100,7 @@ class BotBase:
         self.logger.debug('Cancel expired orders...')
         for order in self.open_orders:
             if (order['status'] in ['new', 'open']) and float(
-                    order['expireTime']) > time.time():
+                    order['expireTime']) > time.time() and order['cancelTime'] is None:
                 _, success = await self.cancel_order(order)
                 if not success:
                     self.logger.error('CANCEL_EXPIRED_ORDERS: cancel_order failed')
@@ -125,17 +125,28 @@ class BotBase:
 
     def _update_order_status(self, data, order):
         try:
-            order['status'] = data['status']
-            order['excutedSize'] = data['filledSize']
-            if order['status'] == 'cancelled':  # FTXではcancelledかfilledはclosedとして表わされる.
+            if isinstance(data, Dict):
+                order['status'] = data['status']
+                order['excutedSize'] = data['filledSize']
+            # new
+            if order['status'] == 'new':  # FTXではcancelledかfilledはclosedとして表わされる.
                 pass
-            elif order['status'] == 'closed' and order['cancelTime'] is not None:  # cancelされた注文はcancelTimeが数値になる
+            # open
+            if order['status'] == 'open':
                 pass
-            elif order['status'] == 'closed' and order['cancelTime'] is None:
+            # cancelled
+            if order['cancelTime'] is not None:  # orderがキューに入ってstatusが更新されていないとき
+                order['status'] = 'cancelled'
+            if order['status'] == 'cancelled':
+                pass
+            # filled or cancelled
+            if order['status'] == 'closed' and order['cancelTime'] is not None:  # cancelされた注文はcancelTimeが数値になる
+                pass
+            if order['status'] == 'closed' and order['cancelTime'] is None:
                 self._update_position_by(order)
-            elif order['status'] == 'filled' and order['cancelTime'] is None:
+            if order['status'] == 'filled' and order['cancelTime'] is None:
                 self._update_position_by(order)
-            return self._update_open_order_by_status(order)
+            return self._update_open_order_by(order)
         except Exception as e:
             print(e)
             self.logger.error(f'_update_open_order_status {str(e)}')
@@ -146,9 +157,13 @@ class BotBase:
             res = await self.ftx.send()
             if res[0]['success']:
                 data = res[0]['result']
+                self.logger.info(data)
+                self.logger.info(
+                    f'cancel_order request success :>> orderId:{order["orderId"]}')
                 order['cancelTime'] = time.time()
+                if not isinstance(data, Dict):
+                    data = None
                 self._update_order_status(data, order)
-                self.logger.info(f'Order cancelled :>> orderId:{order["orderId"]}')
                 return data, True
             else:
                 raise Exception(f'API_REQUEST_FAILED orderId:{order["orderId"]}', res[0])
@@ -157,8 +172,9 @@ class BotBase:
             push_message(str(e))
             return {}, False
 
-    def _update_open_order_by_status(self, order):
+    def _update_open_order_by(self, order):
         try:
+            # cancelled
             if order['status'] == 'cancelled':
                 self.open_orders.remove(order)
             # cancelled
@@ -180,11 +196,12 @@ class BotBase:
     def remove_not_open_orders(self):
         self.logger.debug('Remove not open orders...')
         for order in self.open_orders:
-            self._update_open_order_by_status(order)
+            self._update_open_order_by(order)
 
     def _update_position_by(self, order):
         try:
-            size = order['filledSize'] if order['side'] == 'buy' else -order['filledSize']
+            size = order['excutedSize'] if order['side'] == 'buy' else - \
+                order['excutedSize']
             self.position['size'] += size
             self.position['netSize'] = abs(float(self.position['size']))
             self.position['side'] = 'buy' if float(self.position['size']) > 0 else 'sell'
@@ -192,21 +209,6 @@ class BotBase:
             raise KeyError('KeyError', order)
         except Exception as e:
             self.logger.error(str(e))
-            # def _update_position(self, pos):
-            #     try:
-            #         self.position['cost'] = pos['cost']
-            #         self.position['entryPrice'] = pos['entryPrice']
-            #         self.position['side'] = pos['side']
-            #         self.position['size'] = pos['size']
-            #         self.position['netSize'] = pos['netSize']
-            #         self.position['openSize'] = pos['openSize']
-            #         self.position['realizedPnl'] = pos['realizedPnl']
-            #     except KeyError as e:
-            #         self.logger.error('KeyError _update_position', str(e))
-            #         self.position = pos
-            #     except Exception as e:
-            #         self.logger.error(str(e))
-            #         self.position = pos
 
     async def get_position(self):
         self.ftx.positions()
@@ -227,10 +229,6 @@ class BotBase:
         pos, success = await self.get_position()
         if success:
             self.position = pos
-            # if self.position == {}:
-            # self.position = pos
-            # else:
-            #     self._update_position(pos)
         else:
             self.logger.error('Fail SyncPosition...')
         await asyncio.sleep(delay)
