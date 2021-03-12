@@ -627,7 +627,7 @@ class FTX:
 
     # Get order status
     def order_status(self, order_id):
-        target_path = "".join(["/orders/", order_id])
+        target_path = "".join(["/orders/", str(order_id)])
         params = {}
 
         self.set_request(

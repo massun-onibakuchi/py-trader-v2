@@ -32,7 +32,6 @@ class Bot(BotBase):
             if success:
                 self.logger.debug('new order')
             self.interval = 11
-        print('hoge')
         await asyncio.sleep(interval)
 
 

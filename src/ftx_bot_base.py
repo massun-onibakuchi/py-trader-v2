@@ -6,9 +6,9 @@ from setting.settting import PYTHON_ENV, config
 import time
 from logger import setup_logger
 
-TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config['BOT_NAME']
 MARKET = config['MARKET']
+TRADABLE = config.getboolean('TRADABLE')
 VERBOSE = config.getboolean('VERBOSE')
 PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
 
@@ -123,24 +123,32 @@ class BotBase:
         self.logger.debug('Updating orders status...')
         for order in self.open_orders:
             try:
-                if order['status'] in ['open', 'new'] and float(
-                        order['expireTime']) < time.time():
+                if order['status'] in ['open', 'new']:
                     self.ftx.order_status(order['orderId'])
                     res = await self.ftx.send()
                     if res[0]['success']:
-                        data = res[0]['result']
-                        self._update_order_status(data, order)
+                        if 'result' in res[0]:
+                            data = res[0]['result']
+                            self._update_per_order(data, order)
+                        else:
+                            self.logger.warn(f'key `result` not in {res[0]}')
                     else:
+                        self.logger.error(res[0])
                         raise Exception('API_REQUEST_FAILED UPDATE_ORDERS_STATUS', res[0])
                     await asyncio.sleep(delay)
             except Exception as e:
                 self.logger.error(f'UPDATE_ORDERS_STATUS_FAILED {str(e)}')
 
-    def _update_order_status(self, data, order):
+    def _update_per_order(self, data, order):
         try:
-            if isinstance(data, Dict):
+            if isinstance(data, Dict) and 'status' in data and 'filledSize' in data:
                 order['status'] = data['status']
                 order['excutedSize'] = data['filledSize']
+                if VERBOSE:
+                    self.logger.info(
+                        f'_update_order_status orderId:{order["orderId"]} status:{order["status"]}')
+            else:
+                self.logger.warn(f'Expected Dict type `data`:{data}')
             # new
             if order['status'] == 'new':  # FTXではcancelledかfilledはclosedとして表わされる.
                 pass
@@ -174,9 +182,7 @@ class BotBase:
                 self.logger.info(
                     f'cancel_order request success :>> orderId:{order["orderId"]}')
                 order['cancelTime'] = time.time()
-                if not isinstance(data, Dict):
-                    data = None
-                self._update_order_status(data, order)
+                self._update_per_order(data, order)
                 return data, True
             else:
                 raise Exception(f'API_REQUEST_FAILED orderId:{order["orderId"]}', res[0])
@@ -259,10 +265,10 @@ class BotBase:
             await self.cancel_expired_orders(delay=1)
             await self.update_orders_status(delay=1)
             self.remove_not_open_orders()
-            # if self.MARKET_TYPE.lower() == 'future':
-            #     await self.sync_position()
-            # elif self.MARKET_TYPE.lower() == 'spot':
-            #     pass
+            if self.MARKET_TYPE.lower() == 'future':
+                await self.sync_position()
+            elif self.MARKET_TYPE.lower() == 'spot':
+                pass
             self.log_status()
             await asyncio.sleep(interval)
         except Exception as e:
