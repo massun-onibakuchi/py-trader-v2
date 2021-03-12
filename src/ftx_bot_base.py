@@ -1,9 +1,9 @@
 import asyncio
 from typing import Dict, Union, List, Any
+import time
 from ftx.ftx import FTX
 from line import push_message
 from setting.settting import PYTHON_ENV, config
-import time
 from logger import setup_logger
 
 BOT_NAME = config['BOT_NAME']
@@ -24,7 +24,7 @@ class BotBase:
         self.MARKET: str = _market
         self.MARKET_TYPE: str = market_type
         self.position: Dict[str, Any] = {}
-        self.open_orders: List[Dict[str, Union[str, float]]] = []
+        self.open_orders: List[Dict[str, Any]] = []
 
         self.logger.info(
             f'BOT:{BOT_NAME} started... ENV:{PYTHON_ENV} SUBACCOUNT:{subaccount}')
@@ -70,8 +70,16 @@ class BotBase:
             self.logger.error(e)
             return {}, False
 
-    async def place_order(self, side, ord_type, size, price='',
-                          ioc=False, reduceOnly=False, postOnly=False, sec_to_expire=0):
+    async def place_order(self,
+                          side,
+                          ord_type,
+                          size,
+                          price='',
+                          ioc=False,
+                          reduceOnly=False,
+                          postOnly=False,
+                          sec_to_expire=0,
+                          delay=5):
         try:
             self.ftx.place_order(
                 self.MARKET,
@@ -99,14 +107,17 @@ class BotBase:
                         'excutedSize': data['filledSize'],
                     })
                 self.logger.info(
-                    f'Place_order :>> orderId:{data["id"]},market:{self.MARKET},side:{data["side"]},price:{data["price"]}')
+                    f'Place_order :>> orderId:{data["id"]},market:{self.MARKET},side:{side},price:{data["price"]}')
                 push_message(
-                    f'{BOT_NAME}:place_order\nmarket:{self.MARKET}\nside:{data["side"]}\nprice:{data["price"]}')
+                    f'{BOT_NAME}:place_order\nmarket:{self.MARKET}\nside:{side}\nprice:{data["price"]}')
+                await asyncio.sleep(delay)
                 return data, True
             else:
                 raise Exception(f'PLACE_ORDER_FAILED:{res[0]["error"]}')
         except Exception as e:
             self.logger.error(str(e))
+            push_message(
+                f'{BOT_NAME}:PLACE_ORDER_FAILED\nmarket:{self.MARKET}')
             return {}, False
 
     async def cancel_expired_orders(self, delay=1):
@@ -258,15 +269,15 @@ class BotBase:
     def log_status(self):
         if VERBOSE:
             # self.logger.debug(f'self.position :>> {self.position}')
-            self.logger.info(f'self.open_orders :>> {self.open_orders}')
+            self.logger.debug(f'self.open_orders :>> {self.open_orders}')
 
     async def main(self, interval):
         try:
-            await self.cancel_expired_orders(delay=1)
-            await self.update_orders_status(delay=1)
+            await self.cancel_expired_orders(delay=2)
+            await self.update_orders_status(delay=2)
             self.remove_not_open_orders()
             if self.MARKET_TYPE.lower() == 'future':
-                await self.sync_position()
+                await self.sync_position(delay=5)
             elif self.MARKET_TYPE.lower() == 'spot':
                 pass
             self.log_status()

@@ -60,9 +60,9 @@ class Bot:
         # 引数に与えた条件に当てはまる上場銘柄をリストに抽出する
         listed = self.extract_markets(
             markets=response[0]['result'],
-            include=["spot", "future"],
+            market_type=["spot", "future"],
             exclude=[
-                'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-', "MOVE"
+                'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-', "MOVE-"
             ])
         VERBOSE and self.logger.debug(listed)
         # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
@@ -109,11 +109,11 @@ class Bot:
     def extract_markets(
             self,
             markets,
-            include=["spot", "future"],
-            exclude=["HEDGE", "BULL", "BEAR", "HALF", "BVOL", "-0326"]):
+            market_type=["spot", "future"],
+            exclude=["HEDGE", "BULL", "BEAR", "HALF", "BVOL", "MOVE", "-0326"]):
         satsfied = []
-        has_spot = "spot" in include
-        has_future = "future" in include
+        has_spot = "spot" in market_type
+        has_future = "future" in market_type
         for market in markets:
             if market["enabled"]:
                 if has_spot and market['type'] == "spot" and market["quoteCurrency"] == 'USD':
@@ -142,7 +142,7 @@ class Bot:
     async def entry(self, market, size, ord_type, side, price="", postOnly=False, reduceOnly=False):
         try:
             self.ftx.place_order(
-                type=ord_type,
+                ord_type=ord_type,
                 market=market,
                 side=side,
                 price=price,
@@ -167,7 +167,7 @@ class Bot:
     async def settle(self, market_type=["future"]):
         has_future = "future" in market_type
         for pos in self.positions:
-            if has_future and ("-PERP" in pos["market"]):
+            if has_future and ("/USD" not in pos["market"]):
                 try:
                     if time.time() - pos["orderTime"] >= self.HODL_TIME:
                         price = ""
