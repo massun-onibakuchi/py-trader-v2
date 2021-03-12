@@ -28,7 +28,7 @@ class Bot(BotBase):
         self.logger.debug('strategy....')
         if self.interval == 10:
             _, success = await self.place_order(
-                side='buy', ord_type='limit', size=0.01, price=1000, reduceOnly=False, postOnly=True, sec_to_expire=15)
+                side='buy', ord_type='limit', size=0.01, price=1000, reduceOnly=False, postOnly=True, sec_to_expire=60)
             if success:
                 self.logger.debug('new order')
             self.interval = 11

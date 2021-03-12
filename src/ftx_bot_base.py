@@ -94,7 +94,7 @@ class BotBase:
                         'price': data['price'],
                         'status': data['status'],
                         'orderTime': time.time(),
-                        'expireTime': time.time() + sec_to_expire,
+                        'expireTime': time.time() + float(sec_to_expire),
                         'cancelTime': None,
                         'excutedSize': data['filledSize'],
                     })
@@ -113,7 +113,7 @@ class BotBase:
         self.logger.debug('Cancel expired orders...')
         for order in self.open_orders:
             if (order['status'] in ['new', 'open']) and float(
-                    order['expireTime']) > time.time() and order['cancelTime'] is None:
+                    order['expireTime']) < time.time() and order['cancelTime'] is None:
                 _, success = await self.cancel_order(order)
                 if not success:
                     self.logger.error('CANCEL_EXPIRED_ORDERS: cancel_order failed')
@@ -258,7 +258,7 @@ class BotBase:
         try:
             await self.cancel_expired_orders(delay=1)
             await self.update_orders_status(delay=1)
-            # self.remove_not_open_orders()
+            self.remove_not_open_orders()
             # if self.MARKET_TYPE.lower() == 'future':
             #     await self.sync_position()
             # elif self.MARKET_TYPE.lower() == 'spot':
