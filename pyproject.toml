@@ -6,6 +6,7 @@ authors = ["bakuchi- <helveticaf0015se@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
+pycoingecko = "^1.4.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.8.4"

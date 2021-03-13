@@ -1,6 +1,8 @@
 import asyncio
+from os import name
 from typing import Dict, List, Union
 import time
+from pycoingecko import CoinGeckoAPI
 from ftx.ftx import FTX
 from line import push_message
 from setting.settting import FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, PYTHON_ENV, config
@@ -22,6 +24,7 @@ class Bot:
             api_key=api_key,
             api_secret=api_secret,
             subaccount=SUBACCOUNT)
+        self.cg = CoinGeckoAPI()
         self.logger = setup_logger("log/listed_and_long.log")
         self.prev_markets: List[Dict[str, Union[str, float]]] = []
         self.positions = []
@@ -61,6 +64,7 @@ class Bot:
         listed = self.extract_markets(
             markets=response[0]['result'],
             market_type=["spot", "future"],
+            future_type='-PERP',
             exclude=[
                 'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-', "MOVE-"
             ])
@@ -68,13 +72,15 @@ class Bot:
         # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
         if len(self.prev_markets) > 0:
             # 新規上場銘柄を抽出する
-            new_listed = self.extract_new_listed(self.prev_markets, listed)
+            new_listed, _ = self.extract_new_listed(self.prev_markets, listed, rank=600)
+            self.logger.debug(f'上場銘柄差分:{_}')
+            self.logger.info(f'フィルターで合格した新規上場銘柄：{new_listed}')
+
             for new in new_listed:
                 # SNS通知
                 msg = f"New Listing: {new['name']}"
                 self.logger.info(msg)
                 push_message(msg)
-                await asyncio.sleep(0)
                 # トレードを許可しているならば，エントリー
                 if TRADABLE:
                     ord_type = 'market'
@@ -110,6 +116,7 @@ class Bot:
             self,
             markets,
             market_type=["spot", "future"],
+            future_type='-PERP',
             exclude=["HEDGE", "BULL", "BEAR", "HALF", "BVOL", "MOVE", "-0326"]):
         satsfied = []
         has_spot = "spot" in market_type
@@ -122,11 +129,11 @@ class Bot:
                         is_excluded = is_excluded and keyword not in market["name"]
                     if is_excluded:
                         satsfied.append(market)
-                if has_future and market["type"] == 'future':
+                if has_future and market["type"] == 'future' and future_type in market["name"]:
                     satsfied.append(market)
         return satsfied
 
-    def extract_new_listed(
+    def extract_listing_diff(
             self,
             prev_markets: List[Dict[str, Union[str, float]]],
             current_markets: List[Dict[str, Union[str, float]]]) -> List[Dict[str, Union[str, float]]]:
@@ -138,6 +145,55 @@ class Bot:
             if current_market["name"] not in prev_market_names:
                 new_listed.append(current_market)
         return new_listed
+
+    def extract_new_listed(self, prev_markets, current_markets, rank):
+        specifics = []
+        diff = self.extract_listing_diff(prev_markets, current_markets)
+        for new in diff:
+            key = 'underlying' if new['type'] == 'future' else 'baseCurrency'
+            if str(new[key]).upper() in self.SPECIFIC_NAMES:
+                specifics.append(new.copy())
+        markets = self.fileter_by_market_cap(diff, rank)
+        return markets + specifics, diff
+
+    def fileter_by_market_cap(self, markets, rank=500):
+        coins = self.cg.get_coins_list()
+        markets = self.append_cg_id(markets, coins)
+        for market in markets:
+            try:
+                if 'cg_id' in market and len(market['cg_id']) > 0:
+                    print("market['cg_id'] :>>", market['cg_id'])
+                    result = self.cg.get_coins_markets(
+                        ids=market['cg_id'], vs_currency='usd', category='coin category')
+                    if len(result) > 0:
+                        if result[0]['market_cap_rank'] == 0 or result[0]['market_cap_rank'] > rank:
+                            markets.remove(market)
+                    elif 'error' in result:
+                        raise Exception('COIN_GECKO_API ERROR', market, result)
+                else:
+                    self.logger.info(f'DOES NOT FOUND {market["name"]} coin gecko')
+                    markets.remove(market)
+            except Exception as e:
+                self.logger.error(f'COIN_GECKO_API ERROR {str(e)}')
+        return markets
+
+    def append_cg_id(self, markets: List, cg_coins):
+        try:
+            for market in markets:
+                symbol = ''
+                if market['type'] == "spot":
+                    symbol = market['baseCurrency'].lower()
+                elif market['type'] == 'future':
+                    symbol = market['underlying'].lower()
+                for coin in cg_coins:
+                    if symbol == coin['symbol']:
+                        market['cg_id'] = coin['id']
+                        break
+                    else:
+                        market['cg_id'] = ''
+            return markets
+        except Exception as e:
+            self.logger.error(str(e))
 
     async def entry(self, market, size, ord_type, side, price="", postOnly=False, reduceOnly=False):
         try:
