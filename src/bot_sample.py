@@ -1,6 +1,7 @@
 import asyncio
 from ftx_bot_base import BotBase
 from setting.settting import PYTHON_ENV, config, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT
+from pprint import pprint
 
 
 class Bot(BotBase):
@@ -19,7 +20,6 @@ class Bot(BotBase):
             try:
                 await self.strategy(10)
                 await asyncio.sleep(0)
-
             except Exception as e:
                 self.logger.error('An exception occurred', e)
                 exit(1)
@@ -27,10 +27,13 @@ class Bot(BotBase):
     async def strategy(self, interval):
         self.logger.debug('strategy....')
         if self.interval == 10:
-            _, success = await self.place_order(
-                side='buy', ord_type='limit', size=0.01, price=1000, reduceOnly=False, postOnly=True, sec_to_expire=60)
+            res, success = await self.get_single_market()
+        #     _, success = await self.place_order(
+        # side='buy', ord_type='limit', size=0.01, price=1000, reduceOnly=False,
+        # postOnly=True, sec_to_expire=60)
             if success:
-                self.logger.debug('new order')
+                pprint(res)
+                # self.logger.debug('new order')
             self.interval = 11
         await asyncio.sleep(interval)
 

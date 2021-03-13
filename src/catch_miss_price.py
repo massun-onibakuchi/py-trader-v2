@@ -44,12 +44,12 @@ class Bot(BotBase):
 
     async def strategy(self, interval):
         self.logger.debug('strategy....')
-        
         market, success = await self.get_single_market()
         if success and len(self.open_orders) == 0:
             price = float(market['ask'])
             if len(USD_SIZES) != len(TARGET_PRICE_CHANGES):
                 raise Exception('USD_SIZES TARGET_PRICE_CHANGES の長さが違います')
+
             for i in range(len(USD_SIZES)):
                 target_price = price * (1.0 - TARGET_PRICE_CHANGES[i])
                 size = USD_SIZES[i] / price
