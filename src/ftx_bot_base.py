@@ -273,8 +273,8 @@ class BotBase:
 
     async def main(self, interval):
         try:
-            await self.cancel_expired_orders(delay=2)
             await self.update_orders_status(delay=2)
+            await self.cancel_expired_orders(delay=2)
             self.remove_not_open_orders()
             if self.MARKET_TYPE.lower() == 'future':
                 await self.sync_position(delay=5)

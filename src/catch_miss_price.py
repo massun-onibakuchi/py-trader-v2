@@ -27,7 +27,7 @@ class Bot(BotBase):
         while True:
             try:
                 await self.strategy(10)
-                await asyncio.sleep(0)
+                await asyncio.sleep(10)
             except Exception as e:
                 self.logger.error(f'An exception occurred {str(e)}')
                 push_message(f'Unhandled Error :strategy  {str(e)}')
@@ -44,8 +44,10 @@ class Bot(BotBase):
 
     async def strategy(self, interval):
         self.logger.debug('strategy....')
+        if len(self.open_orders) > 0:
+            return await asyncio.sleep(interval)
         market, success = await self.get_single_market()
-        if success and len(self.open_orders) == 0:
+        if success:
             price = float(market['ask'])
             if len(USD_SIZES) != len(TARGET_PRICE_CHANGES):
                 raise Exception('USD_SIZES TARGET_PRICE_CHANGES の長さが違います')
