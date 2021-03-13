@@ -82,14 +82,14 @@ class BotBase:
                           delay=5):
         try:
             self.ftx.place_order(
-                self.MARKET,
-                side,
-                ord_type,
-                size,
-                price,
-                ioc,
-                reduceOnly,
-                postOnly)
+                market=self.MARKET,
+                side=side,
+                ord_type=ord_type,
+                size=size,
+                price=price,
+                ioc=ioc,
+                reduceOnly=reduceOnly,
+                postOnly=postOnly)
             res = await self.ftx.send()
             if res[0]['success']:
                 data = res[0]['result']
@@ -273,8 +273,8 @@ class BotBase:
 
     async def main(self, interval):
         try:
-            await self.cancel_expired_orders(delay=2)
             await self.update_orders_status(delay=2)
+            await self.cancel_expired_orders(delay=2)
             self.remove_not_open_orders()
             if self.MARKET_TYPE.lower() == 'future':
                 await self.sync_position(delay=5)
