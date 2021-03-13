@@ -1,5 +1,4 @@
 import asyncio
-from re import M
 from typing import Dict, List, Union
 import time
 from pycoingecko import CoinGeckoAPI
