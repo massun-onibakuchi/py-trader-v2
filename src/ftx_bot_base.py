@@ -155,7 +155,7 @@ class BotBase:
             if isinstance(data, Dict) and 'status' in data and 'filledSize' in data:
                 order['status'] = data['status']
                 order['excutedSize'] = data['filledSize']
-                if VERBOSE:
+                if order['status'] == 'closed':
                     self.logger.info(
                         f'_update_order_status orderId:{order["orderId"]} status:{order["status"]}')
             else:

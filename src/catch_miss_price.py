@@ -1,4 +1,5 @@
 import asyncio
+from os import O_DIRECT
 from typing import List
 from ftx_bot_base import BotBase
 from line import push_message
@@ -15,8 +16,7 @@ SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
 class Bot(BotBase):
     def __init__(self, market, market_type, api_key, api_secret, subaccount):
         super().__init__(market, market_type, api_key, api_secret, subaccount)
-
-        self.interval = 10
+        self.validate()
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run(10), self.run_strategy()]
@@ -42,25 +42,44 @@ class Bot(BotBase):
                 self.logger.debug('new order')
             self.interval = 11
 
+    def validate(self):
+        if len(USD_SIZES) != len(TARGET_PRICE_CHANGES):
+            raise Exception('USD_SIZES TARGET_PRICE_CHANGES の長さが違います')
+
     async def strategy(self, interval):
         self.logger.debug('strategy....')
         if len(self.open_orders) > 0:
             return await asyncio.sleep(interval)
-        market, success = await self.get_single_market()
-        if success:
-            price = float(market['ask'])
-            if len(USD_SIZES) != len(TARGET_PRICE_CHANGES):
-                raise Exception('USD_SIZES TARGET_PRICE_CHANGES の長さが違います')
 
-            for i in range(len(USD_SIZES)):
-                target_price = price * (1.0 - TARGET_PRICE_CHANGES[i])
-                size = USD_SIZES[i] / price
-                await self.place_order(
-                    side='buy',
-                    ord_type='limit',
-                    size=size,
-                    price=target_price,
-                    sec_to_expire=SEC_TO_EXPIRE)
+        market, success = await self.get_single_market()
+        if not success:
+            return await asyncio.sleep(interval)
+
+        pos = self.position
+        price = float(market['ask'])
+        if pos != {} and pos['netSize'] > 0:
+            size = pos['netSize'] if pos['netSize'] * \
+                price < 3 * USD_SIZES[0] else pos['openSize'] * 0.3
+            await self.place_order(
+                side='sell',
+                ord_type='limit',
+                size=size,
+                price=price * 1.04,
+                reduceOnly=True,
+                postOnly=True,
+                sec_to_expire=SEC_TO_EXPIRE
+            )
+
+        for i in range(len(USD_SIZES)):
+            target_price = price * (1.0 - TARGET_PRICE_CHANGES[i])
+            size = USD_SIZES[i] / price
+            await self.place_order(
+                side='buy',
+                ord_type='limit',
+                size=size,
+                price=target_price,
+                sec_to_expire=SEC_TO_EXPIRE)
+
         await asyncio.sleep(interval)
 
 

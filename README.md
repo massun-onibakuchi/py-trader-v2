@@ -1,6 +1,8 @@
 # PyTrader
 A python bot that trade a cryptocurrency based on some strategies.
 ## Strategy
+ - ミスプライスロング `catch_miss_price.py`
+ - トークンのリバランスを利用したエントリー `rebalance_entry.py`
  - 上場ロング `listed_and_buy.py`
  - ツイッター監視ロング `tweet_long.py`
 
@@ -8,6 +10,7 @@ A python bot that trade a cryptocurrency based on some strategies.
  - `setting`  set config and env variable
  - `ftx`    ftx api wrapper
  - `twitter`  twitter recent reseach
+ - `ftx_bot_base` ボットの基底クラス
 
 ## How to install
 MacOSX/Linux
