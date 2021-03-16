@@ -48,7 +48,7 @@ class Bot:
                 self.logger.error('An exception occurred', str(e))
             except Exception as e:
                 push_message(str(e))
-                self.logger.error('An exception occurred' + str(e))
+                self.logger.error('An unhandled exception occurred' + str(e))
                 exit(1)
 
     async def main(self, interval):
@@ -73,34 +73,36 @@ class Bot:
         if len(self.prev_markets) > 0:
             # 条件に合格した新規上場銘柄を抽出する
             new_listed, _ = self.extract_new_listed(self.prev_markets, listed, rank=600)
-            self.logger.debug(f'上場銘柄差分:{_}')
-            self.logger.debug(f'合格した新規上場銘柄：{new_listed}')
-
-            for new in new_listed:
-                # SNS通知
-                msg = f"New Listing: {new['name']}"
-                self.logger.info(msg)
-                push_message(msg)
-                # トレードを許可しているならば，エントリー
-                if TRADABLE:
-                    ord_type = 'market'
-                    market = new['name']
-                    price = ''
-                    key = 'underlying' if new['type'] == 'future' else 'baseCurrency'
-                    usd = self.SPECIFIC_USD_SIZE if str(
-                        new[key]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
-                    size = usd / (float(new['bid']) + float(new['ask'])) / 2
-                    if PYTHON_ENV != 'production':
-                        price = 1000
-                        market = 'ETH-PERP'
-                        size = 0.001
-                        ord_type = 'limit'
-                    responce, _ = await self.entry(market, size, ord_type, 'buy', price)
-                    self.positions.append({'orderTime': time.time(),
-                                           'market': market,
-                                           'size': size,
-                                           'side': 'buy',
-                                           'price': responce[0]['result']['price']})
+            self.logger.info(f'上場銘柄差分:{_}')
+            self.logger.info(f'合格した新規上場銘柄：{new_listed}')
+            try:
+                for new in new_listed:
+                    # SNS通知
+                    msg = f"New Listing: {new['name']}"
+                    self.logger.info(msg)
+                    push_message(msg)
+                    # トレードを許可しているならば，エントリー
+                    if TRADABLE:
+                        ord_type = 'market'
+                        market = new['name']
+                        price = ''
+                        key = 'underlying' if new['type'] == 'future' else 'baseCurrency'
+                        usd = self.SPECIFIC_USD_SIZE if str(
+                            new[key]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
+                        size = usd / (float(new['bid']) + float(new['ask'])) / 2
+                        if PYTHON_ENV != 'production':
+                            price = 1000
+                            market = 'ETH-PERP'
+                            size = 0.001
+                            ord_type = 'limit'
+                        responce, _ = await self.entry(market, size, ord_type, 'buy', price)
+                        self.positions.append({'orderTime': time.time(),
+                                               'market': market,
+                                               'size': size,
+                                               'side': 'buy',
+                                               'price': responce[0]['result']['price']})
+            except Exception as e:
+                self.logger.error(str(e))
         # ---------共通の処理----------
         # 最新の上場のリストを更新
         self.prev_markets = listed
@@ -133,6 +135,20 @@ class Bot:
                     satsfied.append(market)
         return satsfied
 
+    def extract_new_listed(self, prev_markets, current_markets, rank):
+        """
+        リスティングの差分をとり，coingeckoに上場していてかつ，coingeckoでの時価総額ランキングが`rank`以上のマーケットのリストを返す
+        ただし，`SPECIFIC_NAMES`に一致する名前を持つ場合はcoingeckoに上場していなくても含まれる
+        """
+        specifics = []
+        diff = self.extract_listing_diff(prev_markets, current_markets)
+        for new in diff:
+            key = 'underlying' if new['type'] == 'future' else 'baseCurrency'
+            if str(new[key]).upper() in self.SPECIFIC_NAMES:
+                specifics.append(new.copy())
+        markets = self.fileter_by_market_cap(diff, rank)
+        return markets + specifics, diff
+
     def extract_listing_diff(
             self,
             prev_markets: List[Dict[str, Union[str, float]]],
@@ -149,20 +165,6 @@ class Bot:
                 new_listed.append(current_market)
         return new_listed
 
-    def extract_new_listed(self, prev_markets, current_markets, rank):
-        """
-        リスティングの差分をとり，coingeckoに上場していてかつ，coingeckoでの時価総額ランキングが`rank`以上のマーケットのリストを返す
-        ただし，`SPECIFIC_NAMES`に一致する名前を持つ場合はcoingeckoに上場していなくても含まれる
-        """
-        specifics = []
-        diff = self.extract_listing_diff(prev_markets, current_markets)
-        for new in diff:
-            key = 'underlying' if new['type'] == 'future' else 'baseCurrency'
-            if str(new[key]).upper() in self.SPECIFIC_NAMES:
-                specifics.append(new.copy())
-        markets = self.fileter_by_market_cap(diff, rank)
-        return markets + specifics, diff
-
     def fileter_by_market_cap(
             self, markets: List[Dict[str, Union[str, float]]], rank=500):
         """
@@ -170,17 +172,21 @@ class Bot:
         """
         if (markets is None) or len(markets) == 0:
             return markets
-        coins = self.cg.get_coins_list()
+        coins = self.cg.get_coins_list()  # List all supported coins id, name and symbol
         markets = self.append_cg_id(markets, coins)
         for market in markets:
             try:
+                # `cg_id`が空文字でないならcoingeckoに上場している.そうでないなら，リストから落とす
                 if 'cg_id' in market and len(str(market['cg_id'])) > 0:
+                    # coingeckoでmarket情報を取得し，時価総額が条件を満たさないならリストから落とす
                     print("market['cg_id'] :>>", market['cg_id'])
                     result = self.cg.get_coins_markets(
                         ids=market['cg_id'], vs_currency='usd', category='coin category')
                     if len(result) > 0:
-                        if result[0]['market_cap_rank'] == 0 or result[0]['market_cap_rank'] > rank:
-                            markets.remove(market)
+                        market_cap_rank = result[0]['market_cap_rank']
+                        if isinstance(market_cap_rank, int):
+                            if market_cap_rank == 0 or market_cap_rank > rank:
+                                markets.remove(market)
                     elif 'error' in result:
                         raise Exception('COIN_GECKO_API ERROR', market, result)
                 else:
