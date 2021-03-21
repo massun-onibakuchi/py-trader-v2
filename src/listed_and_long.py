@@ -65,7 +65,7 @@ class Bot:
             market_type=["spot", "future"],
             future_type='-PERP',
             exclude=[
-                'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', 'BTC-', 'ETH-', "MOVE-"
+                'HEDGE', 'BULL', 'BEAR', 'HALF', 'BVOL', '-0326', "MOVE-"
             ])
         VERBOSE and self.logger.debug(listed)
 

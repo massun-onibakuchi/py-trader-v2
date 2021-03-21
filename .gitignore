@@ -3,7 +3,8 @@ bin
 .venv
 **.csv
 !result_**.csv
-**.env
+.env.**
+!.env.example
 **.png
 **.pdf
 **.log

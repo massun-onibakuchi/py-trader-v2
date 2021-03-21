@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv(verbose=True)
 PYTHON_ENV = os.environ.get("PYTHON_ENV")
-ENV_FILE = '.production.env' if PYTHON_ENV == 'production' else '.development.env'
+ENV_FILE = '.env.production' if PYTHON_ENV == 'production' else '.env.development'
 dotenv_path = os.path.join(os.getcwd(), ENV_FILE)
 load_dotenv(dotenv_path)
 print(".env path :>>" + dotenv_path)
