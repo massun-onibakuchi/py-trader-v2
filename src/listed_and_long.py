@@ -9,6 +9,7 @@ from logger import setup_logger
 
 TRADABLE = config.getboolean('TRADABLE')
 BOT_NAME = config["BOT_NAME"]
+RANK = config.getfloat("RANK")
 VERBOSE = config.getboolean("VERBOSE")
 
 
@@ -72,7 +73,7 @@ class Bot:
         # 前回の上場銘柄リストがあるならば，現在の上場リストと比較して新規上場銘柄があるか調べる
         if len(self.prev_markets) > 0:
             # 条件に合格した新規上場銘柄を抽出する
-            new_listed, _ = self.extract_new_listed(self.prev_markets, listed, rank=600)
+            new_listed, _ = self.extract_new_listed(self.prev_markets, listed, RANK)
             self.logger.info(f'上場銘柄差分:{_}')
             self.logger.info(f'合格した新規上場銘柄：{new_listed}')
             try:
