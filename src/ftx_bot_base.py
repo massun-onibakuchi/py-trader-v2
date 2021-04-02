@@ -80,6 +80,9 @@ class BotBase:
                           postOnly=False,
                           sec_to_expire=0,
                           delay=5):
+        """ place_order
+        新規オーダーを置く.オーダーの成功・失敗を通知する
+        """
         try:
             self.ftx.place_order(
                 market=self.MARKET,

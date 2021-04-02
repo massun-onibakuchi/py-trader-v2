@@ -23,7 +23,7 @@
     ],
     "python.formatting.provider": "autopep8",
     "python.formatting.autopep8Args": [
-        "--max-line-length=90",
+        "--max-line-length=120",
         "--aggressive",
         "--aggressive",
     ],
@@ -46,4 +46,5 @@
     },
     "python.linting.enabled": true,
     "files.autoSave": "afterDelay",
+    "editor.formatOnSave": true,
 }

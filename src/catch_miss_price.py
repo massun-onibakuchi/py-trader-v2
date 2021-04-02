@@ -1,5 +1,4 @@
 import asyncio
-from os import O_DIRECT
 from typing import List
 from ftx_bot_base import BotBase
 from line import push_message
@@ -19,8 +18,8 @@ class Bot(BotBase):
         self.validate()
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
-        tasks = [self.run(10), self.run_strategy()]
         # tasks = [self.run_strategy()]
+        tasks = [self.run(10), self.run_strategy()]
         loop.run_until_complete(asyncio.wait(tasks))
 
     async def run_strategy(self):
@@ -57,9 +56,11 @@ class Bot(BotBase):
 
         pos = self.position
         price = float(market['ask'])
+
+        # positionを持っている時，positonを決済する
         if pos != {} and pos['netSize'] > 0:
-            size = pos['netSize'] if pos['netSize'] * \
-                price < 3 * USD_SIZES[0] else pos['openSize'] * 0.3
+            # 閾値でsizeを変更する
+            size = pos['netSize'] if pos['netSize'] * price < 3 * USD_SIZES[0] else pos['openSize'] * 0.3
             await self.place_order(
                 side='sell',
                 ord_type='limit',
@@ -69,7 +70,7 @@ class Bot(BotBase):
                 postOnly=True,
                 sec_to_expire=SEC_TO_EXPIRE
             )
-
+        # 与えれた変化率に従って指値をばら撒く
         for i in range(len(USD_SIZES)):
             target_price = price * (1.0 - TARGET_PRICE_CHANGES[i])
             size = USD_SIZES[i] / price
