@@ -29,7 +29,7 @@ class Bot(BotBase):
                 await asyncio.sleep(10)
             except Exception as e:
                 self.logger.error(f'An exception occurred {str(e)}')
-                push_message(f'Unhandled Error :strategy  {str(e)}')
+                push_message(f'Unhandled Error :strategy {str(e)}')
                 exit(1)
 
     async def strategy_demo(self, interval):

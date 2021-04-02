@@ -279,6 +279,24 @@ class BotBase:
     async def has_position(self):
         return self.position != {} and self.position['netSize'] > 0
 
+    def push_message(self, data):
+        """ ボットの基本情報＋引数のデータ型に応じたテキストを送信する．
+            `data`がstrなら，基本情報を追加して送信
+            positionなら，sizeとsideの情報を送信
+            orderならpriceとtype,sideを送信
+        """
+        bot_info = f'{self.BOT_NAME}\n{self.MARKET}\n'
+        text = ''
+        if isinstance(data, str):
+            text = data
+        elif isinstance(data, Dict):
+            if 'netSize' in data and 'side' in data:
+                text = f'position\nnet size{self.position["netSize"]}\nside:{self.position["side"]}'
+            if 'price' in data and 'type' in data and 'side' in data:
+                text = f'order\nprice:{data["price"]}\ntype:{data["type"]}\nside:{data["side"]}'
+
+        push_message(f'{bot_info}{text}')
+
     async def main(self, interval):
         try:
             await self.update_orders_status(delay=2)
