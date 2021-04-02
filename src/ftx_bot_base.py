@@ -21,6 +21,7 @@ class BotBase:
             api_secret=api_secret,
             subaccount=subaccount)
         self.logger = setup_logger(f'log/{BOT_NAME.lower()}.log')
+        self.BOT_NAME: str = BOT_NAME
         self.MARKET: str = _market
         self.MARKET_TYPE: str = market_type
         self.position: Dict[str, Any] = {}
@@ -111,8 +112,9 @@ class BotBase:
                     })
                 self.logger.info(
                     f'Place_order :>> orderId:{data["id"]},market:{self.MARKET},side:{side},price:{data["price"]}')
-                push_message(
-                    f'{BOT_NAME}:place_order\nmarket:{self.MARKET}\nside:{side}\nprice:{data["price"]}')
+                if PUSH_NOTIF:
+                    push_message(
+                        f'{BOT_NAME}:place_order\nmarket:{self.MARKET}\nside:{side}\nprice:{data["price"]}')
                 await asyncio.sleep(delay)
                 return data, True
             else:
@@ -273,6 +275,9 @@ class BotBase:
         if VERBOSE:
             # self.logger.debug(f'self.position :>> {self.position}')
             self.logger.debug(f'self.open_orders :>> {self.open_orders}')
+
+    async def has_position(self):
+        return self.position != {} and self.position['netSize'] > 0
 
     async def main(self, interval):
         try:

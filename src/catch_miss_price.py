@@ -47,9 +47,7 @@ class Bot(BotBase):
 
     async def strategy(self, interval):
         self.logger.debug('strategy....')
-        if len(self.open_orders) > 0:
-            return await asyncio.sleep(interval)
-
+        # ---現在価格を取得---
         market, success = await self.get_single_market()
         if not success:
             return await asyncio.sleep(interval)
@@ -57,8 +55,11 @@ class Bot(BotBase):
         pos = self.position
         price = float(market['ask'])
 
-        # positionを持っている時，positonを決済する
-        if pos != {} and pos['netSize'] > 0:
+        # ---positionを持っている時，positonを決済する---
+        if self.has_position():
+            # 通知
+            push_message(f"{self.BOT_NAME}:{self.MARKET}:{pos['netSize']}")
+            # ---settle---
             # 閾値でsizeを変更する
             size = pos['netSize'] if pos['netSize'] * price < 3 * USD_SIZES[0] else pos['openSize'] * 0.3
             await self.place_order(
@@ -70,16 +71,20 @@ class Bot(BotBase):
                 postOnly=True,
                 sec_to_expire=SEC_TO_EXPIRE
             )
-        # 与えれた変化率に従って指値をばら撒く
-        for i in range(len(USD_SIZES)):
-            target_price = price * (1.0 - TARGET_PRICE_CHANGES[i])
-            size = USD_SIZES[i] / price
-            await self.place_order(
-                side='buy',
-                ord_type='limit',
-                size=size,
-                price=target_price,
-                sec_to_expire=SEC_TO_EXPIRE)
+
+        # ---オープンオーダーがあるない時---
+        if len(self.open_orders) == 0:
+            # ---place---
+            # 与えれた変化率に従って指値をばら撒く
+            for i in range(len(USD_SIZES)):
+                target_price = price * (1.0 - TARGET_PRICE_CHANGES[i])
+                size = USD_SIZES[i] / price
+                await self.place_order(
+                    side='buy',
+                    ord_type='limit',
+                    size=size,
+                    price=target_price,
+                    sec_to_expire=SEC_TO_EXPIRE)
 
         await asyncio.sleep(interval)
 
