@@ -14,6 +14,31 @@ VERBOSE = config.getboolean('VERBOSE')
 PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
 
 
+class CycleError(Exception):
+    def __init__(self, expression, msg):
+        self.expression = expression
+        self.msg = msg
+
+    def __str__(self):
+        return f'CycleError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+
+
+class OrderCycleError(CycleError):
+    def __init__(self, order, msg):
+        super().__init__(order, msg)
+
+    def __str__(self):
+        return f'OrderCycleError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+
+
+class PositionCycleError(CycleError):
+    def __init__(self, order, msg):
+        super().__init__(order, msg)
+
+    def __str__(self):
+        return f'PositionCycleError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+
+
 class APIRequestError(Exception):
     def __init__(self, expression, msg=""):
         self.expression = expression
@@ -107,8 +132,9 @@ class BotBase:
             res = await self.ftx.send()
             if res[0]['success']:
                 data = res[0]['result']
+                new_order = {}
                 if data['status'] != 'cancelled':
-                    self.open_orders.append({
+                    new_order = {
                         'orderId': data['id'],
                         'side': data['side'],
                         'type': data['type'],
@@ -119,8 +145,9 @@ class BotBase:
                         'expireTime': time.time() + float(sec_to_expire),
                         'cancelTime': None,
                         'excutedSize': data['filledSize'],
-                    })
-                self.logger.info(self._message(data))
+                    }
+                    self.open_orders.append(new_order)
+                self.logger.info(self._message(new_order))
                 if PUSH_NOTIF:
                     self.push_message(data)
                 await asyncio.sleep(delay)
@@ -164,14 +191,16 @@ class BotBase:
 
     def _update_per_order(self, data, order):
         try:
-            if isinstance(data, Dict) and 'status' in data and 'filledSize' in data:
-                order['status'] = data['status']
-                order['excutedSize'] = data['filledSize']
-                if order['status'] == 'closed':
-                    self.logger.debug(
-                        f'_update_order_status orderId:{order["orderId"]} status:{order["status"]}')
+            if isinstance(data, Dict):
+                if 'status' in data and 'filledSize' in data:
+                    order['status'] = data['status']
+                    order['excutedSize'] = data['filledSize']
+                    if order['status'] == 'closed':
+                        self.logger.debug(self._message(order, 'update'))
+                else:
+                    self.logger.warn(f'`No valid key in data`:{data}')
             else:
-                self.logger.warn(f'Expected Dict type `data`:{data}')
+                self.logger.error(f'Expected Dict type `data`:{data}')
             # new
             if order['status'] == 'new':  # FTXではcancelledかfilledはclosedとして表わされる.
                 pass
@@ -281,7 +310,7 @@ class BotBase:
             # self.logger.debug(f'self.position :>> {self.position}')
             self.logger.debug(f'self.open_orders :>> {self.open_orders}')
 
-    async def has_position(self):
+    def has_position(self):
         return self.position != {} and self.position['netSize'] > 0
 
     def _message(self, data='', msg_type=''):
@@ -290,17 +319,19 @@ class BotBase:
             text = data
         elif isinstance(data, Dict):
             if 'netSize' in data and 'side' in data:
-                text = f'Position netSize{self.position["netSize"]} side:{self.position["side"]}'
-            if 'orderId' in data and 'price' in data and 'status' in data and 'side' in data:
+                text = f'Position netSize:{data["netSize"]} side:{data["side"]}'
+            if 'orderId' in data and 'status' in data:
                 base = f'order:{data["orderId"]} status:{data["status"]}'
                 if msg_type.lower() == 'new':
                     text = 'New' + base
-                if msg_type.lower() == 'update':
+                elif msg_type.lower() == 'update':
                     text = 'Update' + base
                 elif msg_type.lower() == 'cancel':
                     text = 'Cancel' + base
-                else:
+                elif 'side' in data and 'price' in data and 'type' in data:
                     text = base + f'price:{data["price"]} type:{data["type"]} side:{data["side"]}'
+                else:
+                    text = base
         if text == '':
             text = '_unexpexted_data_type_'
         return text
