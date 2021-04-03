@@ -1,5 +1,6 @@
-import asyncio
 from typing import Dict, Union, List, Any
+import asyncio
+import inspect
 import time
 from ftx.ftx import FTX
 from line import push_message
@@ -13,6 +14,15 @@ VERBOSE = config.getboolean('VERBOSE')
 PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
 
 
+class APIRequestError(Exception):
+    def __init__(self, expression, msg=""):
+        self.expression = expression
+        self.msg = msg
+
+    def __str__(self):
+        return f'APIRequestError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+
+
 class BotBase:
     def __init__(self, _market, market_type, api_key, api_secret, subaccount):
         self.ftx = FTX(
@@ -22,13 +32,13 @@ class BotBase:
             subaccount=subaccount)
         self.logger = setup_logger(f'log/{BOT_NAME.lower()}.log')
         self.BOT_NAME: str = BOT_NAME
+        self.SUBACCOUNT = subaccount
         self.MARKET: str = _market
         self.MARKET_TYPE: str = market_type
         self.position: Dict[str, Any] = {}
         self.open_orders: List[Dict[str, Any]] = []
 
-        self.logger.info(
-            f'BOT:{BOT_NAME} started... ENV:{PYTHON_ENV} SUBACCOUNT:{subaccount}')
+        self.logger.info(f'ENV:{PYTHON_ENV} {self.SUBACCOUNT} {self.BOT_NAME} {self.MARKET}')
         # タスクの設定およびイベントループの開始
         # loop = asyncio.get_event_loop()
         # tasks = [self.run()]
@@ -44,8 +54,7 @@ class BotBase:
                 await asyncio.sleep(0)
             except Exception as e:
                 self.logger.error(f'An exception occurred: {str(e)}')
-                push_message(str(e))
-                exit(1)
+                self.push_message(str(e))
 
     async def get_single_market(self):
         try:
@@ -54,9 +63,9 @@ class BotBase:
             if res[0]['success']:
                 return res[0]['result'], True
             else:
-                raise Exception('API_REQUEST_FAILED get_single_market', res[0])
+                raise APIRequestError(res[0]['error'])
         except Exception as e:
-            print(e)
+            self.logger.error(str(e))
             return {}, False
 
     async def get_markets(self):
@@ -66,9 +75,9 @@ class BotBase:
             if res[0]['success']:
                 return res[0]['result'], True
             else:
-                raise Exception('API_REQUEST_FAILED', res[0])
+                raise APIRequestError(res[0]['error'])
         except Exception as e:
-            self.logger.error(e)
+            self.logger.error(str(e))
             return {}, False
 
     async def place_order(self,
@@ -83,6 +92,7 @@ class BotBase:
                           delay=5):
         """ place_order
         新規オーダーを置く.オーダーの成功・失敗を通知する
+        レスポンスのオーダー情報とリクエストの可否のタプルを返す．
         """
         try:
             self.ftx.place_order(
@@ -110,19 +120,16 @@ class BotBase:
                         'cancelTime': None,
                         'excutedSize': data['filledSize'],
                     })
-                self.logger.info(
-                    f'Place_order :>> orderId:{data["id"]},market:{self.MARKET},side:{side},price:{data["price"]}')
+                self.logger.info(self._message(data))
                 if PUSH_NOTIF:
-                    push_message(
-                        f'{BOT_NAME}:place_order\nmarket:{self.MARKET}\nside:{side}\nprice:{data["price"]}')
+                    self.push_message(data)
                 await asyncio.sleep(delay)
                 return data, True
             else:
-                raise Exception(f'PLACE_ORDER_FAILED:{res[0]["error"]}')
+                raise APIRequestError(res[0]['error'])
         except Exception as e:
             self.logger.error(str(e))
-            push_message(
-                f'{BOT_NAME}:PLACE_ORDER_FAILED\nmarket:{self.MARKET}')
+            self.push_message(str(e))
             return {}, False
 
     async def cancel_expired_orders(self, delay=1):
@@ -150,7 +157,7 @@ class BotBase:
                             self.logger.warn(f'key `result` not in {res[0]}')
                     else:
                         self.logger.error(res[0])
-                        raise Exception('API_REQUEST_FAILED UPDATE_ORDERS_STATUS', res[0])
+                        raise APIRequestError(res[0]['error'])
                     await asyncio.sleep(delay)
             except Exception as e:
                 self.logger.error(f'UPDATE_ORDERS_STATUS_FAILED {str(e)}')
@@ -161,7 +168,7 @@ class BotBase:
                 order['status'] = data['status']
                 order['excutedSize'] = data['filledSize']
                 if order['status'] == 'closed':
-                    self.logger.info(
+                    self.logger.debug(
                         f'_update_order_status orderId:{order["orderId"]} status:{order["status"]}')
             else:
                 self.logger.warn(f'Expected Dict type `data`:{data}')
@@ -185,7 +192,6 @@ class BotBase:
                 self._update_position_by(order)
             return self._update_open_order_by(order)
         except Exception as e:
-            print(e)
             self.logger.error(f'_update_open_order_status {str(e)}')
 
     async def cancel_order(self, order):
@@ -194,17 +200,15 @@ class BotBase:
             res = await self.ftx.send()
             if res[0]['success']:
                 data = res[0]['result']
-                self.logger.info(data)
-                self.logger.info(
-                    f'cancel_order request success :>> orderId:{order["orderId"]}')
+                self.logger.info(self._message(data, 'cancel'))
                 order['cancelTime'] = time.time()
                 self._update_per_order(data, order)
                 return data, True
             else:
-                raise Exception(f'API_REQUEST_FAILED orderId:{order["orderId"]}', res[0])
+                raise APIRequestError(res[0]['error'], f'orderId {order["orderId"]}')
         except Exception as e:
             self.logger.error(str(e))
-            push_message(str(e))
+            self.push_message(str(e))
             return {}, False
 
     def _update_open_order_by(self, order):
@@ -250,14 +254,15 @@ class BotBase:
         res = await self.ftx.send()
         try:
             if res[0]['success']:
-                for pos in res[0]['result']:
+                data = res[0]['result']
+                for pos in data:
                     key = 'future' if 'future' in pos else 'name'
                     if self.MARKET in pos[key]:
                         return pos, True
                 else:
                     raise Exception('ERROR res[0] :>> ', res[0]['result'])
             else:
-                raise Exception('API_REQUEST_FAILED get_position', res[0])
+                raise APIRequestError(res[0]['error'])
         except Exception as e:
             print(e)
             return {}, False
@@ -279,23 +284,36 @@ class BotBase:
     async def has_position(self):
         return self.position != {} and self.position['netSize'] > 0
 
-    def push_message(self, data):
-        """ ボットの基本情報＋引数のデータ型に応じたテキストを送信する．
-            `data`がstrなら，基本情報を追加して送信
-            positionなら，sizeとsideの情報を送信
-            orderならpriceとtype,sideを送信
-        """
-        bot_info = f'{self.BOT_NAME}\n{self.MARKET}\n'
+    def _message(self, data='', msg_type=''):
         text = ''
         if isinstance(data, str):
             text = data
         elif isinstance(data, Dict):
             if 'netSize' in data and 'side' in data:
-                text = f'position\nnet size{self.position["netSize"]}\nside:{self.position["side"]}'
-            if 'price' in data and 'type' in data and 'side' in data:
-                text = f'order\nprice:{data["price"]}\ntype:{data["type"]}\nside:{data["side"]}'
+                text = f'Position netSize{self.position["netSize"]} side:{self.position["side"]}'
+            if 'orderId' in data and 'price' in data and 'status' in data and 'side' in data:
+                base = f'order:{data["orderId"]} status:{data["status"]}'
+                if msg_type.lower() == 'new':
+                    text = 'New' + base
+                if msg_type.lower() == 'update':
+                    text = 'Update' + base
+                elif msg_type.lower() == 'cancel':
+                    text = 'Cancel' + base
+                else:
+                    text = base + f'price:{data["price"]} type:{data["type"]} side:{data["side"]}'
+        if text == '':
+            text = '_unexpexted_data_type_'
+        return text
 
-        push_message(f'{bot_info}{text}')
+    def push_message(self, data):
+        """ ボットの基本情報＋引数のデータ型に応じたテキストを追加して送信する．
+             - `data`がstrなら，そのまま送信
+             - `position`なら，sizeとsideを送信
+             - `order`ならpriceとtype,sideを送信
+        """
+        bot_info = f'{self.SUBACCOUNT}:{self.BOT_NAME}\n{self.MARKET}'
+        text = self._message(data)
+        push_message(f'{bot_info}\n{text}')
 
     async def main(self, interval):
         try:

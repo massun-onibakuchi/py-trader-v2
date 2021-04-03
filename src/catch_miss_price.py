@@ -1,7 +1,6 @@
 import asyncio
 from typing import List
 from ftx_bot_base import BotBase
-from line import push_message
 from setting.settting import PYTHON_ENV, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, config
 import json
 
@@ -29,7 +28,7 @@ class Bot(BotBase):
                 await asyncio.sleep(10)
             except Exception as e:
                 self.logger.error(f'An exception occurred {str(e)}')
-                push_message(f'Unhandled Error :strategy {str(e)}')
+                self.push_message(f'Unhandled Error :strategy {str(e)}')
                 exit(1)
 
     async def strategy_demo(self, interval):
@@ -58,7 +57,7 @@ class Bot(BotBase):
         # ---positionを持っている時，positonを決済する---
         if self.has_position():
             # 通知
-            push_message(f"{self.BOT_NAME}:{self.MARKET}:{pos['netSize']}")
+            self.push_message(pos)
             # ---settle---
             # 閾値でsizeを変更する
             size = pos['netSize'] if pos['netSize'] * price < 3 * USD_SIZES[0] else pos['openSize'] * 0.3
