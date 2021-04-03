@@ -21,14 +21,14 @@ def _message(data='', msg_type=''):
     elif isinstance(data, Dict):
         # dataがpositionデータの時
         if 'netSize' in data and 'side' in data:
-            base = f'Position netSize:{data["netSize"]} side:{data["side"]}'
-            if msg_type == 'update':
+            base = f'Position netSize:{data["netSize"]} side:{data["side"]} '
+            if msg_type.lower() == 'update':
                 text = 'Update' + base
-            elif msg_type == 'sync':
+            elif msg_type.lower() == 'sync':
                 text = 'Sync' + base
         # dataがオーダーデータの時
         if 'orderId' in data and 'status' in data:
-            base = f'order:{data["orderId"]} status:{data["status"]}'
+            base = f'order:{data["orderId"]} status:{data["status"]} '
             if msg_type.lower() == 'new':
                 text = 'New' + base
             elif msg_type.lower() == 'update':
@@ -205,7 +205,11 @@ class BotBase:
                 await asyncio.sleep(delay)
 
     async def update_orders_status(self, delay=1):
-        self.logger.debug('Updating orders status...')
+        """
+            オープンオーダーリストの`status`がopenまたはnewのオーダーのステータスをリクエストして更新する．
+            約定済み，キャンセルになったオーダーはリストから削除し，ポジションを自炊更新する．
+        """
+        self.logger.debug('[Cycle] Updating orders status...')
         for order in self.open_orders:
             try:
                 if order['status'] in ['open', 'new']:
@@ -222,7 +226,7 @@ class BotBase:
                         raise APIRequestError(res[0]['error'])
                     await asyncio.sleep(delay)
             except Exception as e:
-                self.logger.error(f'UPDATE_ORDERS_STATUS_FAILED {str(e)}')
+                self.logger.error(f'[Cycle] UPDATE_ORDERS_STATUS_ERROR {str(e)}')
 
     def _update_per_order(self, data, order):
         """
@@ -239,7 +243,7 @@ class BotBase:
                 else:
                     self.logger.warn(f'`No valid key in data`:{data}')
             else:
-                self.logger.error(f'Expected Dict type `data`:{data}')
+                self.logger.warn(f'Expected type [Dict] `data`:{data}')
             # new
             if order['status'] == 'new':  # FTXではcancelledかfilledはclosedとして表わされる.
                 pass
@@ -261,8 +265,13 @@ class BotBase:
             return self._update_open_order_by(order)
         except Exception as e:
             self.logger.error(f'_update_open_order_status {str(e)}')
+            raise
 
     async def cancel_order(self, order):
+        """ オーダーをキャンセルをリクエストする
+            キャンセルリクエストのタイムスタンプをオーダーに追加する.および，オープンオーダーのリストから削除する．
+            リクエストが失敗した時のみ，通知する
+        """
         try:
             self.ftx.cancel_order(order['orderId'])
             res = await self.ftx.send()
@@ -280,6 +289,9 @@ class BotBase:
             return {}, False
 
     def _update_open_order_by(self, order):
+        """ `order`でオープンオーダーリストを更新する
+            ステータスがキャンセルまたは，約定済みならばリストから削除する
+        """
         try:
             # cancelled
             if order['status'] == 'cancelled':
@@ -302,11 +314,15 @@ class BotBase:
             # raise Exception(f'UPDATE_OPEN_ORDER_BY_STATUS {str(e)}')
 
     def remove_not_open_orders(self):
-        self.logger.debug('Remove not open orders...')
+        """ オープンオーダーリストのオーダーでステータスがキャンセルのものを全て削除する
+        """
+        self.logger.debug('[Cycle] Removec canceled orders...')
         for order in self.open_orders:
             self._update_open_order_by(order)
 
     def _update_position_by(self, order):
+        """ `order`でポジションを自炊更新する
+        """
         try:
             size = order['excutedSize'] if order['side'] == 'buy' else - \
                 order['excutedSize']
@@ -334,16 +350,18 @@ class BotBase:
             else:
                 raise APIRequestError(res[0]['error'])
         except Exception as e:
-            print(e)
+            self.logger.error(str(e))
             return {}, False
 
     async def sync_position(self, delay=0):
+        """ ポジションをリクエストして最新の状態に同期させる．
+        """
         self.logger.debug('Sync position...')
         pos, success = await self.get_position()
         if success:
             self.position = pos
         else:
-            self.logger.error('Fail SyncPosition...')
+            self.logger.error('[Cycle] SYNC_POSITION_ERROR')
         await asyncio.sleep(delay)
 
     def log_status(self):
