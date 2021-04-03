@@ -23,8 +23,17 @@ def _message(data='', msg_type=''):
     return text
 
 
+class SampleError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self, message):
+        return 'hogehoge'
+
+
 position = {'netSize': 12, 'side': 212}
 order = {'orderId': 21}
+print("str(SampleError) :>>", str(SampleError))
 print("_message('test') :>>", _message("test"))
 print("_message(position) :>>", _message(position))
 print("_message(order) :>>", _message(order))

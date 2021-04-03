@@ -14,29 +14,60 @@ VERBOSE = config.getboolean('VERBOSE')
 PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
 
 
+def _message(data='', msg_type=''):
+    text = ''
+    if isinstance(data, str):
+        text = data
+    elif isinstance(data, Dict):
+        # dataがpositionデータの時
+        if 'netSize' in data and 'side' in data:
+            base = f'Position netSize:{data["netSize"]} side:{data["side"]}'
+            if msg_type == 'update':
+                text = 'Update' + base
+            elif msg_type == 'sync':
+                text = 'Sync' + base
+        # dataがオーダーデータの時
+        if 'orderId' in data and 'status' in data:
+            base = f'order:{data["orderId"]} status:{data["status"]}'
+            if msg_type.lower() == 'new':
+                text = 'New' + base
+            elif msg_type.lower() == 'update':
+                text = 'Update' + base
+            elif msg_type.lower() == 'cancel':
+                text = 'Cancel' + base
+            elif 'side' in data and 'price' in data and 'type' in data:
+                text = base + f'price:{data["price"]} type:{data["type"]} side:{data["side"]}'
+            else:
+                text = base
+    if text == '':
+        text = '_unexpexted_data_type_'
+    return text
+
+
 class CycleError(Exception):
-    def __init__(self, expression, msg):
+    def __init__(self, expression, msg_type=''):
         self.expression = expression
-        self.msg = msg
+        self.msg_type = msg_type
 
     def __str__(self):
-        return f'CycleError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+        if self.error_name == '':
+            self.error_name = 'CycleError'
+        return self._error_message()
+
+    def _error_message(self):
+        return f'{self.error_name}:{inspect.stack()[1].function} {_message(self.expression,self.msg_type)}'
 
 
 class OrderCycleError(CycleError):
-    def __init__(self, order, msg):
-        super().__init__(order, msg)
-
-    def __str__(self):
-        return f'OrderCycleError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+    def __init__(self, order, msg_type):
+        super().__init__(order, msg_type)
+        self.error_name = 'OrderCycleError'
 
 
 class PositionCycleError(CycleError):
-    def __init__(self, order, msg):
-        super().__init__(order, msg)
-
-    def __str__(self):
-        return f'PositionCycleError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+    def __init__(self, data, msg_type):
+        super().__init__(data, msg_type)
+        self.error_name = 'PositionCycleError'
 
 
 class APIRequestError(Exception):
@@ -165,8 +196,12 @@ class BotBase:
             if (order['status'] in ['new', 'open']) and float(
                     order['expireTime']) < time.time() and order['cancelTime'] is None:
                 _, success = await self.cancel_order(order)
-                if not success:
-                    self.logger.error('CANCEL_EXPIRED_ORDERS: cancel_order failed')
+                try:
+                    if not success:
+                        raise OrderCycleError(order, 'cancel')
+                        # self.logger.error('CANCEL_EXPIRED_ORDERS: cancel_order failed')
+                except Exception as e:
+                    self.logger.error(str(e))
                 await asyncio.sleep(delay)
 
     async def update_orders_status(self, delay=1):
@@ -190,6 +225,10 @@ class BotBase:
                 self.logger.error(f'UPDATE_ORDERS_STATUS_FAILED {str(e)}')
 
     def _update_per_order(self, data, order):
+        """
+            `data`で`order`の情報を更新する，および
+            `order`の情報で現在ポジションとオープンオーダーのリストを更新する．
+        """
         try:
             if isinstance(data, Dict):
                 if 'status' in data and 'filledSize' in data:
@@ -208,7 +247,7 @@ class BotBase:
             if order['status'] == 'open':
                 pass
             # cancelled
-            if order['cancelTime'] is not None:  # orderがキューに入ってstatusが更新されていないとき
+            if order['cancelTime'] is not None:  # orderがキューに入ってstatusが更新されていないときcancelledとみなす
                 order['status'] = 'cancelled'
             if order['status'] == 'cancelled':
                 pass
@@ -259,7 +298,8 @@ class BotBase:
                 self.logger.warn(f'Unexpected Order status{order["status"]}')
         except Exception as e:
             self.logger.error(str(e))
-            raise Exception(f'UPDATE_OPEN_ORDER_BY_STATUS {str(e)}')
+            raise OrderCycleError(order, 'update')
+            # raise Exception(f'UPDATE_OPEN_ORDER_BY_STATUS {str(e)}')
 
     def remove_not_open_orders(self):
         self.logger.debug('Remove not open orders...')
@@ -277,6 +317,7 @@ class BotBase:
             raise KeyError('KeyError', order)
         except Exception as e:
             self.logger.error(str(e))
+            raise PositionCycleError(order, 'update')
 
     async def get_position(self):
         self.ftx.positions()
@@ -314,27 +355,7 @@ class BotBase:
         return self.position != {} and self.position['netSize'] > 0
 
     def _message(self, data='', msg_type=''):
-        text = ''
-        if isinstance(data, str):
-            text = data
-        elif isinstance(data, Dict):
-            if 'netSize' in data and 'side' in data:
-                text = f'Position netSize:{data["netSize"]} side:{data["side"]}'
-            if 'orderId' in data and 'status' in data:
-                base = f'order:{data["orderId"]} status:{data["status"]}'
-                if msg_type.lower() == 'new':
-                    text = 'New' + base
-                elif msg_type.lower() == 'update':
-                    text = 'Update' + base
-                elif msg_type.lower() == 'cancel':
-                    text = 'Cancel' + base
-                elif 'side' in data and 'price' in data and 'type' in data:
-                    text = base + f'price:{data["price"]} type:{data["type"]} side:{data["side"]}'
-                else:
-                    text = base
-        if text == '':
-            text = '_unexpexted_data_type_'
-        return text
+        return _message(data, msg_type)
 
     def push_message(self, data):
         """ ボットの基本情報＋引数のデータ型に応じたテキストを追加して送信する．
