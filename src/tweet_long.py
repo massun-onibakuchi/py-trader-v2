@@ -101,7 +101,7 @@ class Bot:
                 if TRADABLE:
                     if PYTHON_ENV == 'production':
                         self.ftx.place_order(
-                            type='market',
+                            ord_type='market',
                             market=MARKET,
                             side='buy',
                             price='',
@@ -109,7 +109,7 @@ class Bot:
                             postOnly=False)
                     else:
                         self.ftx.place_order(
-                            type='limit',
+                            ord_type='limit',
                             market=MARKET,
                             side='buy',
                             price=1111,

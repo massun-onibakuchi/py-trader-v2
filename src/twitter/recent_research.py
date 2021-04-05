@@ -2,7 +2,7 @@ import requests
 import os
 import json
 from os.path import join
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 load_dotenv(verbose=True)
@@ -18,6 +18,16 @@ def auth():
 # Rate limits https://developer.twitter.com/en/docs/rate-limits
 # 450 requests per 15 - minute window(app auth)
 # 180 requests per 15 - minute window(user auth)
+
+
+def create_time_fields(sec=10, day=0):
+    since_date = ""
+    td = ""
+    utc_date = datetime.now(timezone.utc)
+    td = timedelta(days=day, seconds=sec)
+    since_date = utc_date - td
+    start_time_fields = "start_time=" + since_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return start_time_fields
 
 
 def create_url(queries=[]):
