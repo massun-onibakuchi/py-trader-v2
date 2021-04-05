@@ -74,8 +74,9 @@ class Bot:
         if len(self.prev_markets) > 0:
             # 条件に合格した新規上場銘柄を抽出する
             new_listed, _ = self.extract_new_listed(self.prev_markets, listed, RANK)
-            self.logger.info(f'上場銘柄差分:{_}')
-            self.logger.info(f'合格した新規上場銘柄：{new_listed}')
+            if len(new_listed) > 0:
+                self.logger.info(f'上場銘柄差分:{_}')
+                self.logger.info(f'合格した新規上場銘柄：{new_listed}')
             try:
                 for new in new_listed:
                     # SNS通知
@@ -258,6 +259,7 @@ class Bot:
                             ord_type=ord_type,
                             price=price,
                             side='sell',
+                            postOnly=False,
                             reduceOnly=True
                         )
                         if success:

@@ -51,16 +51,15 @@ class Bot(BotBase):
         if not success:
             return await asyncio.sleep(interval)
 
-        pos = self.position
         price = float(market['ask'])
-
         # ---positionを持っている時，positonを決済する---
         if self.has_position():
             # 通知
-            self.push_message(pos)
+            self.push_message(self.position)
             # ---settle---
             # 閾値でsizeを変更する
-            size = pos['netSize'] if pos['netSize'] * price < 3 * USD_SIZES[0] else pos['openSize'] * 0.3
+            size = self.position['netSize'] if self.position['netSize'] * \
+                price < 3 * USD_SIZES[0] else self.position['openSize'] * 0.3
             await self.place_order(
                 side='sell',
                 ord_type='limit',
@@ -71,7 +70,7 @@ class Bot(BotBase):
                 sec_to_expire=SEC_TO_EXPIRE
             )
 
-        # ---オープンオーダーがあるない時---
+        # ---オープンオーダーがない時---
         if len(self.open_orders) == 0:
             # ---place---
             # 与えれた変化率に従って指値をばら撒く

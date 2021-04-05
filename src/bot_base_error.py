@@ -8,14 +8,14 @@ def _message(data='', msg_type=''):
         text = data
     elif isinstance(data, Dict):
         # dataがpositionデータの時
-        if 'netSize' in data and 'side' in data:
+        if ('netSize' in data) and ('side' in data):
             base = f'Position netSize:{data["netSize"]} side:{data["side"]} '
             if msg_type.lower() == 'update':
                 text = 'Update' + base
             elif msg_type.lower() == 'sync':
                 text = 'Sync' + base
         # dataがオーダーデータの時
-        if 'orderId' in data and 'status' in data:
+        if ('orderId' in data) and ('status' in data):
             base = f'order:{data["orderId"]} status:{data["status"]} '
             if msg_type.lower() == 'new':
                 text = 'New' + base

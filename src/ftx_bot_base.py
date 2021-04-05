@@ -2,13 +2,14 @@ from typing import Dict, Union, List, Any
 import asyncio
 import time
 from ftx.ftx import FTX
-from bot_base_error import APIRequestError, PositionCycleError, OrderCycleError, _message
+from bot_base_error import APIRequestError, CycleError, PositionCycleError, OrderCycleError, _message
 from line import push_message
 from setting.settting import PYTHON_ENV, config
 from logger import setup_logger
 
 BOT_NAME = config['BOT_NAME']
 MARKET = config['MARKET']
+MAX_ORDER_NUMBER = config.getint('MAX_ORDER_NUMBER')
 TRADABLE = config.getboolean('TRADABLE')
 VERBOSE = config.getboolean('VERBOSE')
 PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
@@ -23,6 +24,7 @@ class BotBase:
             subaccount=subaccount)
         self.logger = setup_logger(f'log/{BOT_NAME.lower()}.log')
         self.BOT_NAME: str = BOT_NAME
+        self.MAX_ORDER_NUMBER: int = MAX_ORDER_NUMBER
         self.SUBACCOUNT = subaccount
         self.MARKET: str = _market
         self.MARKET_TYPE: str = market_type
@@ -70,6 +72,28 @@ class BotBase:
         except Exception as e:
             self.logger.error(str(e))
             return {}, False
+
+    async def get_open_orders(self):
+        try:
+            self.ftx.open_orders()
+            res = await self.ftx.send()
+            if res[0]['success']:
+                return res[0]['result'], True
+            else:
+                raise APIRequestError(res[0]['error'])
+        except Exception as e:
+            self.push_message(str(e))
+            self.logger.error(str(e))
+            return {}, False
+
+    async def require_num_open_orders_within(self, max_order_number):
+        open_orders, success = await self.get_open_orders()
+        if success:
+            if len(open_orders) > max_order_number:
+                msg = f'TOO_MANY_OPEN_ORDERS: {len(open_orders)}'
+                self.logger.warn(msg)
+                self.push_message(msg)
+                raise CycleError(msg)
 
     async def place_order(self,
                           side,
@@ -126,7 +150,10 @@ class BotBase:
             return {}, False
 
     async def cancel_expired_orders(self, delay=1):
-        self.logger.debug('Cancel expired orders...')
+        """ 期限切れの全てのオーダーをキャンセルする．
+            ステータスがopenまたはnewではない時に限る.
+        """
+        self.logger.debug('[Cycle] Cancel expired orders...')
         for order in self.open_orders:
             if (order['status'] in ['new', 'open']) and float(
                     order['expireTime']) < time.time() and order['cancelTime'] is None:
@@ -289,9 +316,10 @@ class BotBase:
             return {}, False
 
     async def sync_position(self, delay=0):
-        """ ポジションをリクエストして最新の状態に同期させる．
         """
-        self.logger.debug('Sync position...')
+            ポジションをリクエストして最新の状態に同期させる．
+        """
+        self.logger.debug('[Cycle] Sync position...')
         pos, success = await self.get_position()
         if success:
             self.position = pos
@@ -329,7 +357,18 @@ class BotBase:
                 await self.sync_position(delay=5)
             elif self.MARKET_TYPE.lower() == 'spot':
                 pass
+            await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
             self.log_status()
             await asyncio.sleep(interval)
         except Exception as e:
             self.logger.error(f'ERROR: {str(e)}')
+        except CycleError as e:
+            msg = ''
+            self.ftx.cancel_all_orders()
+            res = await self.ftx.send()
+            if res[0]['success']:
+                msg = '[Cycle] CANCEL_ALL_ORDERS'
+                self.logger.info(msg)
+                self.push_message(msg)
+            else:
+                raise
