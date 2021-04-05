@@ -25,6 +25,7 @@ async def run():
     while True:
         try:
             print('start')
+            time.sleep(10)
             await main(5)
             print('end')
             # await asyncio.sleep(0)

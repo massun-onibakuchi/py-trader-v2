@@ -27,7 +27,7 @@ class Bot(BotBase):
                 await self.strategy(10)
                 await asyncio.sleep(10)
             except Exception as e:
-                self.logger.error(f'An exception occurred {str(e)}')
+                self.logger.error(f'Unhandled Error :strategy {str(e)}')
                 self.push_message(f'Unhandled Error :strategy {str(e)}')
                 exit(1)
 
@@ -54,22 +54,25 @@ class Bot(BotBase):
 
         # ---- 方法2：quantZoneで決済する----
         # 閾値でsizeを変更する
-        size = self.position['size'] if self.position['size'] * \
-            price < 3 * USD_SIZES[0] else self.position['openSize'] * 0.3
-        # ---positionを持っていて，まだsettleを出してないとき，positonを決済する---
-        if self.isvalid_reduce_only(size):
-            # 通知
-            self.push_message(self.position)
-            # ---settle---
-            await self.place_order(
-                side='sell',
-                ord_type='limit',
-                size=size,
-                price=price * 1.04,
-                reduceOnly=True,
-                postOnly=True,
-                sec_to_expire=SEC_TO_EXPIRE
-            )
+        if self.has_position():
+            size = self.position['size'] if self.position['size'] * \
+                price < 3 * USD_SIZES[0] else self.position['openSize'] * 0.3
+            # ---positionを持っていて，まだsettleを出してないとき，positonを決済する---
+            if self.isvalid_reduce_only(size):
+                # 通知
+                self.push_message(self.position)
+                # ---settle---
+                await self.place_order(
+                    side='sell',
+                    ord_type='limit',
+                    size=size,
+                    price=price * 1.04,
+                    reduceOnly=True,
+                    postOnly=True,
+                    sec_to_expire=SEC_TO_EXPIRE
+                )
+
+        # ---- 方法2：quantZoneで決済する----
 
         # ---オープンオーダーがない時---
         if len(self.open_orders) == 0:

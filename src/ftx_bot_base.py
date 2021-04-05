@@ -30,6 +30,7 @@ class BotBase:
         self.MARKET_TYPE: str = market_type
         self.position: Dict[str, Any] = {}
         self.open_orders: List[Dict[str, Any]] = []
+        self.next_update_time = time.time()
 
         self.logger.info(f'ENV:{PYTHON_ENV} {self.SUBACCOUNT} {self.BOT_NAME} {self.MARKET}')
         # タスクの設定およびイベントループの開始
@@ -370,7 +371,9 @@ class BotBase:
 
     async def main(self, interval):
         try:
-            await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
+            if time.time() > self.next_update_time:
+                await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
+                self.next_update_time += 60
             await self.update_orders_status(delay=2)
             await self.cancel_expired_orders(delay=2)
             self.remove_not_open_orders()

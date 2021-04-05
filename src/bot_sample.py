@@ -8,7 +8,7 @@ class Bot(BotBase):
     def __init__(self, market, market_type, api_key, api_secret, subaccount):
         super().__init__(market, market_type, api_key, api_secret, subaccount)
 
-        self.interval = 10
+        self.flag = 1
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run(10), self.run_strategy()]
@@ -19,22 +19,22 @@ class Bot(BotBase):
         while True:
             try:
                 await self.strategy(10)
-                await asyncio.sleep(0)
+                await asyncio.sleep(5)
             except Exception as e:
                 self.logger.error('An exception occurred', e)
                 exit(1)
 
     async def strategy(self, interval):
         self.logger.debug('strategy....')
-        if self.interval == 10:
+        if self.flag:
             res, success = await self.get_single_market()
-        #     _, success = await self.place_order(
-        # side='buy', ord_type='limit', size=0.01, price=1000, reduceOnly=False,
-        # postOnly=True, sec_to_expire=60)
+            _, success = await self.place_order(
+                side='buy', ord_type='limit', size=0.01, price=1000, reduceOnly=False,
+                postOnly=True, sec_to_expire=60)
             if success:
                 pprint(res)
                 # self.logger.debug('new order')
-            self.interval = 11
+            self.flag = 0
         await asyncio.sleep(interval)
 
 
