@@ -50,16 +50,17 @@ class Bot(BotBase):
         market, success = await self.get_single_market()
         if not success:
             return await asyncio.sleep(interval)
-
         price = float(market['ask'])
-        # ---positionを持っている時，positonを決済する---
-        if self.has_position():
+
+        # ---- 方法2：quantZoneで決済する----
+        # 閾値でsizeを変更する
+        size = self.position['size'] if self.position['size'] * \
+            price < 3 * USD_SIZES[0] else self.position['openSize'] * 0.3
+        # ---positionを持っていて，まだsettleを出してないとき，positonを決済する---
+        if self.isvalid_reduce_only(size):
             # 通知
             self.push_message(self.position)
             # ---settle---
-            # 閾値でsizeを変更する
-            size = self.position['netSize'] if self.position['netSize'] * \
-                price < 3 * USD_SIZES[0] else self.position['openSize'] * 0.3
             await self.place_order(
                 side='sell',
                 ord_type='limit',

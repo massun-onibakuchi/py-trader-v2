@@ -27,6 +27,8 @@ def _message(data='', msg_type=''):
                 text = base + f'price:{data["price"]} type:{data["type"]} side:{data["side"]}'
             else:
                 text = base
+        if 'error' in data and isinstance(data['error'], str):
+            text = data['error']
     if text == '':
         text = '_unexpexted_data_type_'
     return text
@@ -59,9 +61,8 @@ class PositionCycleError(CycleError):
 
 
 class APIRequestError(Exception):
-    def __init__(self, expression, msg=""):
+    def __init__(self, expression):
         self.expression = expression
-        self.msg = msg
 
     def __str__(self):
-        return f'APIRequestError:{inspect.stack()[1].function} {self.expression}:{self.msg}'
+        return f'APIRequestError:{inspect.stack()[1].function} {_message(self.expression)}'

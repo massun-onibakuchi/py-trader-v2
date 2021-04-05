@@ -46,7 +46,7 @@ class BotBase:
                 await self.main(interval)
                 await asyncio.sleep(0)
             except Exception as e:
-                self.logger.error(f'An exception occurred: {str(e)}')
+                self.logger.error(f'RUN_CYCLE_ERROR: {str(e)}')
                 self.push_message(str(e))
 
     async def get_single_market(self):
@@ -87,6 +87,9 @@ class BotBase:
             return {}, False
 
     async def require_num_open_orders_within(self, max_order_number):
+        """
+            オープンオーダーが与えられたオーダー数なら，`CycleError`エラーを投げる
+        """
         open_orders, success = await self.get_open_orders()
         if success:
             if len(open_orders) > max_order_number:
@@ -94,6 +97,21 @@ class BotBase:
                 self.logger.warn(msg)
                 self.push_message(msg)
                 raise CycleError(msg)
+
+    def isvalid_reduce_only(self, size):
+        reduce_only_size = 0.0
+        pos = self.position
+        if not self.has_position():
+            return False
+        for op_ord in self.open_orders:
+            if op_ord['reduceOnly']:
+                reduce_only_size += op_ord['size']
+        if reduce_only_size + size >= pos['size']:
+            self.logger.warn('Invalid ResuceOnly order')
+            self.push_message('Invalid ResuceOnly order')
+            return False
+        else:
+            return True
 
     async def place_order(self,
                           side,
@@ -110,6 +128,8 @@ class BotBase:
         レスポンスのオーダー情報とリクエストの可否のタプルを返す．
         """
         try:
+            if not self.isvalid_reduce_only(size):
+                return {}, False
             self.ftx.place_order(
                 market=self.MARKET,
                 side=side,
@@ -244,7 +264,7 @@ class BotBase:
                 self._update_per_order(data, order)
                 return data, True
             else:
-                raise APIRequestError(res[0]['error'], f'orderId {order["orderId"]}')
+                raise APIRequestError(f'ERROR:{res[0]["error"]}:orderId {order["orderId"]}')
         except Exception as e:
             self.logger.error(str(e))
             self.push_message(str(e))
@@ -333,7 +353,7 @@ class BotBase:
             self.logger.debug(f'self.open_orders :>> {self.open_orders}')
 
     def has_position(self):
-        return self.position != {} and self.position['netSize'] > 0
+        return self.position != {} and self.position['size'] > 0
 
     def _message(self, data='', msg_type=''):
         return _message(data, msg_type)
@@ -350,6 +370,7 @@ class BotBase:
 
     async def main(self, interval):
         try:
+            await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
             await self.update_orders_status(delay=2)
             await self.cancel_expired_orders(delay=2)
             self.remove_not_open_orders()
@@ -357,7 +378,6 @@ class BotBase:
                 await self.sync_position(delay=5)
             elif self.MARKET_TYPE.lower() == 'spot':
                 pass
-            await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
             self.log_status()
             await asyncio.sleep(interval)
         except Exception as e:

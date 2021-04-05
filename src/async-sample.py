@@ -5,7 +5,7 @@ import time
 async def g(i):
     print('print 1', i)
     await asyncio.sleep(3)
-    print('print 2', i)
+    # print('print 2', i)
     return "hello"
 
 
