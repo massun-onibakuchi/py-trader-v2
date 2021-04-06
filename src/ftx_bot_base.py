@@ -13,6 +13,8 @@ MAX_ORDER_NUMBER = config.getint('MAX_ORDER_NUMBER')
 TRADABLE = config.getboolean('TRADABLE')
 VERBOSE = config.getboolean('VERBOSE')
 PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
+MAX_POSITION_SIZE = config.getfloat('MAX_POSITION_SIZE')
+SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
 
 
 class BotBase:
@@ -28,6 +30,7 @@ class BotBase:
         self.SUBACCOUNT = subaccount
         self.MARKET: str = _market
         self.MARKET_TYPE: str = market_type
+        self.MAX_POSITION_SIZE = MAX_POSITION_SIZE
         self.position: Dict[str, Any] = {}
         self.open_orders: List[Dict[str, Any]] = []
         self.next_update_time = time.time()
@@ -114,6 +117,9 @@ class BotBase:
         else:
             return True
 
+    def isvalid_size(self, size):
+        return ('size' in self.position) and (self.MAX_POSITION_SIZE >= self.position['size'])
+
     async def place_order(self,
                           side,
                           ord_type,
@@ -122,15 +128,18 @@ class BotBase:
                           ioc=False,
                           reduceOnly=False,
                           postOnly=False,
-                          sec_to_expire=0,
+                          sec_to_expire=SEC_TO_EXPIRE,
                           delay=5):
         """ place_order
         新規オーダーを置く.オーダーの成功・失敗を通知する
         レスポンスのオーダー情報とリクエストの可否のタプルを返す．
         """
         try:
-            if not self.isvalid_reduce_only(size):
-                return {}, False
+            # if self.isvalid_size(size):
+            #     return {}, False
+            if reduceOnly:
+                if not self.isvalid_reduce_only(size):
+                    return {}, False
             self.ftx.place_order(
                 market=self.MARKET,
                 side=side,

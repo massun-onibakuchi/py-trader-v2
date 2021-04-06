@@ -33,10 +33,10 @@ class Bot(BotBase):
         pos, success = await self.get_position()
         if not success:
             return await asyncio.sleep(5)
-        elif pos["size"] > float(MAX_POSITION_SIZE):
-            msg = f'MAX_POSITION_SIZE current size:{pos["size"]}'
-            self.logger.info(msg)
-            self.push_message(msg)
+        # elif pos["size"] > self.MAX_POSITION_SIZE:
+        #     msg = f'MAX_POSITION_SIZE current size:{pos["size"]}'
+        #     self.logger.info(msg)
+        #     self.push_message(msg)
         else:
             query = "query=from:elonmusk -is:retweet"
             tweet_fields = "tweet.fields=author_id"
