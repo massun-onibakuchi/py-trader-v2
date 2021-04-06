@@ -167,7 +167,7 @@ class BotBase:
                         'excutedSize': data['filledSize'],
                     }
                     self.open_orders.append(new_order)
-                self.logger.info(self._message(new_order))
+                self.logger.info(self._message(new_order, 'new'))
                 if PUSH_NOTIF:
                     self.push_message(data)
                 await asyncio.sleep(delay)
@@ -316,10 +316,9 @@ class BotBase:
         """ `order`でポジションを自炊更新する
         """
         try:
-            size = order['excutedSize'] if order['side'] == 'buy' else - \
-                order['excutedSize']
-            self.position['size'] += size
-            self.position['netSize'] = abs(float(self.position['size']))
+            net_excuted = order['excutedSize'] if order['side'] == 'buy' else - order['excutedSize']
+            self.position['size'] += abs(net_excuted)  # sizeは絶対値
+            self.position['netSize'] += net_excuted
             self.position['side'] = 'buy' if float(self.position['size']) > 0 else 'sell'
         except KeyError as e:
             raise KeyError('KeyError', order)
@@ -368,14 +367,14 @@ class BotBase:
     def _message(self, data='', msg_type=''):
         return _message(data, msg_type)
 
-    def push_message(self, data):
+    def push_message(self, data, msg_type=''):
         """ ボットの基本情報＋引数のデータ型に応じたテキストを追加して送信する．
              - `data`がstrなら，そのまま送信
              - `position`なら，sizeとsideを送信
              - `order`ならpriceとtype,sideを送信
         """
         bot_info = f'{self.SUBACCOUNT}:{self.BOT_NAME}\n{self.MARKET}'
-        text = self._message(data)
+        text = self._message(data, msg_type)
         push_message(f'{bot_info}\n{text}')
 
     async def main(self, interval):
@@ -384,6 +383,9 @@ class BotBase:
                 await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
                 self.next_update_time += 60
             await self.update_orders_status(delay=2)
+
+            await asyncio.sleep(5)
+
             await self.cancel_expired_orders(delay=2)
             self.remove_not_open_orders()
             if self.MARKET_TYPE.lower() == 'future':

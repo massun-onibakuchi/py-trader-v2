@@ -27,10 +27,15 @@ class Bot(BotBase):
     async def strategy(self, interval):
         self.logger.debug('strategy....')
         if self.flag:
-            res, success = await self.get_single_market()
-            _, success = await self.place_order(
-                side='buy', ord_type='limit', size=0.01, price=1000, reduceOnly=False,
-                postOnly=True, sec_to_expire=60)
+            # _, success = await self.get_single_market()
+            res, success = await self.place_order(
+                side='buy',
+                ord_type='limit',
+                size=0.01,
+                price=55000,
+                reduceOnly=False,
+                postOnly=True,
+                sec_to_expire=60)
             if success:
                 pprint(res)
                 # self.logger.debug('new order')

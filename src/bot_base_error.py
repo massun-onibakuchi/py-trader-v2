@@ -11,18 +11,20 @@ def _message(data='', msg_type=''):
         if ('netSize' in data) and ('side' in data):
             base = f'Position netSize:{data["netSize"]} side:{data["side"]} '
             if msg_type.lower() == 'update':
-                text = 'Update' + base
+                text = 'Update ' + base
             elif msg_type.lower() == 'sync':
-                text = 'Sync' + base
+                text = 'Sync ' + base
+            else:
+                text = base
         # dataがオーダーデータの時
         if ('orderId' in data) and ('status' in data):
             base = f'order:{data["orderId"]} status:{data["status"]} '
             if msg_type.lower() == 'new':
-                text = 'New' + base
+                text = 'New ' + base
             elif msg_type.lower() == 'update':
-                text = 'Update' + base
+                text = 'Update ' + base
             elif msg_type.lower() == 'cancel':
-                text = 'Cancel' + base
+                text = 'Cancel ' + base
             elif 'side' in data and 'price' in data and 'type' in data:
                 text = base + f'price:{data["price"]} type:{data["type"]} side:{data["side"]}'
             else:
