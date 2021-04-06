@@ -1,3 +1,7 @@
+"""
+    BotBaseを使ってない実装
+    ロングと決済を行う．
+"""
 import asyncio
 from typing import Dict, List, Union
 import time

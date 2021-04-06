@@ -1,3 +1,7 @@
+"""
+    BotBaseを継承したボット．
+    現在のところ，エントリーのみで決済しない．
+"""
 import asyncio
 from ftx_bot_base import BotBase
 from setting.settting import PYTHON_ENV, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, config
