@@ -8,12 +8,14 @@ MARKET_TYPE = config["MARKET_TYPE"]
 
 MAX_POSITION_SIZE = config.getfloat('MAX_POSITION_SIZE')
 SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
+SIZE = config.getfloat('SIZE')
 
 
 class Bot(BotBase):
     def __init__(self, market, market_type, api_key, api_secret, subaccount):
         super().__init__(market, market_type, api_key, api_secret, subaccount)
         self.MARKET = MARKET
+        self.SIZE = SIZE
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         # tasks = [self.run_strategy()]
@@ -30,13 +32,15 @@ class Bot(BotBase):
                 self.push_message(f'Unhandled Error :strategy {str(e)}')
 
     async def strategy(self, interval):
-        pos, success = await self.get_position()
-        if not success:
-            return await asyncio.sleep(5)
+        # pos, success = await self.get_position()
+        # if not success:
+        #     return await asyncio.sleep(5)
         # elif pos["size"] > self.MAX_POSITION_SIZE:
         #     msg = f'MAX_POSITION_SIZE current size:{pos["size"]}'
         #     self.logger.info(msg)
         #     self.push_message(msg)
+        if 1:
+            pass
         else:
             query = "query=from:elonmusk -is:retweet"
             tweet_fields = "tweet.fields=author_id"
@@ -53,7 +57,7 @@ class Bot(BotBase):
                         ord_type='market',
                         side='buy',
                         price='',
-                        size=3800,
+                        size=self.SIZE,
                         postOnly=False,
                         ioc=True,
                         sec_to_expire=SEC_TO_EXPIRE

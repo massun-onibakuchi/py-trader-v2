@@ -348,13 +348,16 @@ class BotBase:
         """
             ポジションをリクエストして最新の状態に同期させる．
         """
-        self.logger.debug('[Cycle] Sync position...')
-        pos, success = await self.get_position()
-        if success:
-            self.position = pos
-        else:
-            self.logger.error('[Cycle] SYNC_POSITION_ERROR')
-        await asyncio.sleep(delay)
+        try:
+            self.logger.debug('[Cycle] Sync position...')
+            pos, success = await self.get_position()
+            if success:
+                self.position = pos
+            else:
+                raise PositionCycleError('SYNC_POSITION_ERROR', '')
+            await asyncio.sleep(delay)
+        except PositionCycleError as e:
+            self.logger.error(str(e))
 
     def log_status(self):
         if VERBOSE:
