@@ -199,10 +199,9 @@ class FTX:
                     self.session = await aiohttp.ClientSession().__aenter__()
                 if request["method"] is "GET":
                     async with self.session.get(
-                        url=request["url"],
-                        params=request["params"],
-                        headers=request["headers"],
-                    ) as response:
+                            url=request["url"],
+                            params=request["params"],
+                            headers=request["headers"]) as response:
                         status = response.status
                         content = await response.read()
                         if status != 200:
@@ -504,7 +503,7 @@ class FTX:
     #     }
     #   ]
     # }
-    
+
     # Change account leverage
     # また今度
 
@@ -563,6 +562,7 @@ class FTX:
     # REST API(Orders)
     # ------------------------------------------------ #
     # Get open orders
+    # Error起きる message: Not logged In
     def open_orders(self):
         target_path = "/orders"
         params = {"market": self.MARKET}

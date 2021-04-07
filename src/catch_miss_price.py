@@ -29,7 +29,6 @@ class Bot(BotBase):
             except Exception as e:
                 self.logger.error(f'Unhandled Error :strategy {str(e)}')
                 self.push_message(f'Unhandled Error :strategy {str(e)}')
-                exit(1)
 
     async def strategy_demo(self, interval):
         self.logger.debug('strategy....')

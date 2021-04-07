@@ -33,6 +33,7 @@ class BotBase:
         self.MAX_POSITION_SIZE = MAX_POSITION_SIZE
         self.position: Dict[str, Any] = {}
         self.open_orders: List[Dict[str, Any]] = []
+        self.error_tracking = {'count': 0, 'error_message': '', 'timestamp': 0}
         self.next_update_time = time.time()
 
         self.logger.info(f'ENV:{PYTHON_ENV} {self.SUBACCOUNT} {self.BOT_NAME} {self.MARKET}')
@@ -351,11 +352,11 @@ class BotBase:
         try:
             self.logger.debug('[Cycle] Sync position...')
             pos, success = await self.get_position()
+            await asyncio.sleep(delay)
             if success:
                 self.position = pos
             else:
                 raise PositionCycleError('SYNC_POSITION_ERROR', '')
-            await asyncio.sleep(delay)
         except PositionCycleError as e:
             self.logger.error(str(e))
 
