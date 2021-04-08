@@ -327,7 +327,10 @@ class BotBase:
             self.logger.error(str(e))
             raise PositionCycleError(order, 'update')
 
-    async def get_position(self):
+    async def get_position(self, market=None):
+        if market is None:
+            market = self.MARKET
+
         self.ftx.positions()
         res = await self.ftx.send()
         try:
@@ -335,7 +338,7 @@ class BotBase:
                 data = res[0]['result']
                 for pos in data:
                     key = 'future' if 'future' in pos else 'name'
-                    if self.MARKET in pos[key]:
+                    if market in pos[key]:
                         return pos, True
                 else:
                     raise Exception('ERROR res[0] :>> ', res[0]['result'])

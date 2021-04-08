@@ -9,6 +9,7 @@ import time
 import hmac
 import hashlib
 from requests import Request
+from urllib.parse import urlencode, urlparse
 
 
 class FTX:
@@ -163,24 +164,20 @@ class FTX:
         return headers
 
     def get_payload(self, timestamp, method, url, params):
+        """ get  payload
+            :param timestamp:unixtime
+            :param method:request type
+            :param url:url excluding query params
+        """
         request = Request(method, url)
         prepared = request.prepare()
-
-        if len(params) > 0:
-            signature_payload = "".join(
-                [
-                    str(timestamp),
-                    prepared.method,
-                    prepared.path_url,
-                    "{}".format(json.dumps(params)),
-                ]
-            ).encode()
-        else:
-            signature_payload = "".join(
-                [str(timestamp), prepared.method, prepared.path_url]
-            ).encode()
-
-        return signature_payload
+        signature_payload = f"{str(timestamp)}{prepared.method}{prepared.path_url}"
+        print("prepared.path_url :>>", prepared.path_url)
+        if method is "GET" and len(params):
+            signature_payload += '?' + urlencode(params)
+        elif len(params):
+            signature_payload += json.dumps(params)
+        return signature_payload.encode()
 
     def get_sign(self, signature_payload):
         signature = hmac.new(
@@ -335,7 +332,7 @@ class FTX:
         target_path = "".join(["/markets/", self.MARKET, "/candles"])
         # GET
         # /markets/{market_name}/candles?resolution={resolution}&limit={limit}&start_time={start_time}&end_time={end_time}
-        params = {"limit": limit}
+        params = {"resulution": resolution, "limit": limit}
 
         if len(start_time) > 0:
             params["start_time"] = start_time
@@ -453,7 +450,7 @@ class FTX:
         self.set_request(
             method="GET",
             access_modifiers="public",
-            target_path="/expired_futures",
+            target_path=target_path,
             params=params,
         )
 
