@@ -9,7 +9,7 @@ import time
 import hmac
 import hashlib
 from requests import Request
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode
 
 
 class FTX:
@@ -136,6 +136,7 @@ class FTX:
                 )
 
             if method == "DELETE":
+
                 signature_payload = self.get_payload(
                     timestamp, method, url, params)
                 signature = self.get_sign(signature_payload)
@@ -147,7 +148,7 @@ class FTX:
                         "url": url,
                         "method": method,
                         "headers": headers,
-                        "params": params,
+                        "params": params if params == {} else json.dumps(params),
                     }
                 )
 
@@ -172,7 +173,7 @@ class FTX:
         request = Request(method, url)
         prepared = request.prepare()
         signature_payload = f"{str(timestamp)}{prepared.method}{prepared.path_url}"
-        print("prepared.path_url :>>", prepared.path_url)
+        # print("prepared.path_url :>>", prepared.path_url)
         if method is "GET" and len(params):
             signature_payload += '?' + urlencode(params)
         elif len(params):
@@ -689,10 +690,16 @@ class FTX:
 
     # Cancel all orders
     # 未確認
-    def cancel_all_orders(self):
+    def cancel_all_orders(self, market=None, conditionalOrdersOnly=False, limitOrdersOnly=False):
         target_path = "/orders"
-        params = {}
+        if market is None:
+            market = self.MARKET
 
+        params = {
+            "market": market,
+            "conditionalOrdersOnly": conditionalOrdersOnly,
+            "limitOrdersOnly": limitOrdersOnly
+        }
         self.set_request(
             method="DELETE",
             access_modifiers="private",

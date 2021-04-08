@@ -97,7 +97,7 @@ class BotBase:
         """
         open_orders, success = await self.get_open_orders()
         if success:
-            if len(open_orders) > max_order_number:
+            if len(open_orders) >= max_order_number:
                 msg = f'TOO_MANY_OPEN_ORDERS: {len(open_orders)}'
                 self.logger.warn(msg)
                 self.push_message(msg)
@@ -365,8 +365,8 @@ class BotBase:
 
     def log_status(self):
         if VERBOSE:
-            # self.logger.debug(f'self.position :>> {self.position}')
-            self.logger.debug(f'self.open_orders :>> {self.open_orders}')
+            self.logger.debug(f'self.position :>> {self.position["netSize"]}')
+            self.logger.debug(f'self.open_orders lenth :>> {len(self.open_orders)}')
 
     def has_position(self):
         return self.position != {} and self.position['size'] > 0
@@ -384,11 +384,18 @@ class BotBase:
         text = self._message(data, msg_type)
         push_message(f'{bot_info}\n{text}')
 
+    def _isupdatable(self, interval):
+        if time.time() > self.next_update_time:
+            self.next_update_time += interval
+            return True
+        else:
+            return False
+
     async def main(self, interval):
         try:
-            if time.time() > self.next_update_time:
+            if self._isupdatable(60):
                 await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
-                self.next_update_time += 60
+
             await self.update_orders_status(delay=2)
 
             await asyncio.sleep(5)
@@ -401,15 +408,16 @@ class BotBase:
                 pass
             self.log_status()
             await asyncio.sleep(interval)
-        except Exception as e:
-            self.logger.error(f'ERROR: {str(e)}')
         except CycleError as e:
-            msg = ''
             self.ftx.cancel_all_orders()
             res = await self.ftx.send()
-            if res[0]['success']:
+            print("res[0] :>>", res[0])
+            if res[0]['success'] and 'result' in res[0]:
                 msg = '[Cycle] CANCEL_ALL_ORDERS'
                 self.logger.info(msg)
                 self.push_message(msg)
             else:
-                raise
+                raise APIRequestError(res[0]['error'])
+        except Exception as e:
+            self.logger.error(str(e))
+            self.push_message(str(e))

@@ -38,12 +38,11 @@ def _message(data='', msg_type=''):
 
 class CycleError(Exception):
     def __init__(self, expression, msg_type=''):
+        self.error_name = 'CycleError'
         self.expression = expression
         self.msg_type = msg_type
 
     def __str__(self):
-        if self.error_name == '':
-            self.error_name = 'CycleError'
         return self._error_message()
 
     def _error_message(self):

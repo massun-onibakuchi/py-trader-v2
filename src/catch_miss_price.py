@@ -86,7 +86,6 @@ class Bot(BotBase):
                     size=size,
                     price=target_price,
                     sec_to_expire=SEC_TO_EXPIRE)
-
         await asyncio.sleep(interval)
 
 
