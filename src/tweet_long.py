@@ -3,6 +3,8 @@
     エントリーのみで決済しない．
 """
 import asyncio
+from typing import List
+import json
 from ftx_bot_base import BotBase
 from setting.settting import PYTHON_ENV, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, config
 from twitter.recent_research import recent_research, create_time_fields
@@ -13,6 +15,8 @@ MARKET_TYPE = config["MARKET_TYPE"]
 MAX_POSITION_SIZE = config.getfloat('MAX_POSITION_SIZE')
 SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
 SIZE = config.getfloat('SIZE')
+QUERY = config['QUERY']
+KEY_WORDS: List[str] = json.loads(config['KEY_WORDS'])
 
 
 class Bot(BotBase):
@@ -46,11 +50,11 @@ class Bot(BotBase):
         if 1:
             pass
         else:
-            query = "query=from:elonmusk -is:retweet"
+            query = QUERY
             tweet_fields = "tweet.fields=author_id"
             start_time_fields = create_time_fields(sec=12)
             queries = [query, tweet_fields, start_time_fields]
-            keywords = ['doge', 'Doge', 'DOGE']
+            keywords = KEY_WORDS
 
             result = recent_research(keywords, queries)
 

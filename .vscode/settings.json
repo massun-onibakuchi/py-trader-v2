@@ -6,6 +6,7 @@
     "python.linting.lintOnSave": true,
     //Tabをスペースキーとして変換
     "[python]": {
+        "editor.defaultFormatter": null,
         "editor.insertSpaces": true,
         "editor.detectIndentation": true,
         "editor.tabSize": 4

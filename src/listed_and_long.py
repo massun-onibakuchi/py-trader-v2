@@ -91,7 +91,7 @@ class Bot:
                     if TRADABLE:
                         ord_type = 'market'
                         market = new['name']
-                        price = ''
+                        price = float(new['bid'])
                         key = 'underlying' if new['type'] == 'future' else 'baseCurrency'
                         usd = self.SPECIFIC_USD_SIZE if str(
                             new[key]).upper() in self.SPECIFIC_NAMES else self.DEFAULT_USD_SIZE
@@ -107,6 +107,7 @@ class Bot:
                                                'size': size,
                                                'side': 'buy',
                                                'price': responce[0]['result']['price']})
+                        await self.entry(market, size, 'limit', 'sell', price * 1.08)
             except Exception as e:
                 self.logger.error(str(e))
         # ---------共通の処理----------
