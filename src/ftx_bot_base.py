@@ -384,7 +384,7 @@ class BotBase:
         text = self._message(data, msg_type)
         push_message(f'{bot_info}\n{text}')
 
-    def _isupdatable(self, interval):
+    def _update(self, interval):
         if time.time() > self.next_update_time:
             self.next_update_time += interval
             return True
@@ -393,7 +393,7 @@ class BotBase:
 
     async def main(self, interval):
         try:
-            if self._isupdatable(60):
+            if self._update(60):
                 await self.require_num_open_orders_within(self.MAX_ORDER_NUMBER)
 
             await self.update_orders_status(delay=2)
