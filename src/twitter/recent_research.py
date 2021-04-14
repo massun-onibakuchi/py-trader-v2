@@ -1,3 +1,4 @@
+from typing import Dict, List, Any
 import requests
 import os
 import json
@@ -53,32 +54,44 @@ def connect_to_endpoint(url, headers):
     return response.json()
 
 
-def check_txt(keywords, txt):
+def isunion(a, b):
+    return a or b
+
+
+def isintersect(a, b):
+    return a and b
+
+
+def check_txt(keywords, txt, cond='or'):
+    func = isunion if cond == 'or' else isintersect
     is_included = False
     for word in keywords:
-        is_included = (word in txt) or is_included
+        is_included = func((word in txt), is_included)
     return is_included
 
 
-def mining_txt(keywords, datas):
+def mining_txt(keywords, datas: Dict[str, Any], cond='or'):
     matched_data = []
     if datas["meta"]["result_count"] == 0:
         return []
     for data in datas["data"]:
-        if check_txt(keywords, data["text"]):
+        if check_txt(keywords, data["text"], cond):
             matched_data.append(data)
     return matched_data
 
 
-def recent_research(keywords, queries):
+def recent_research(keywords, queries, cond='or'):
+    """ tweeter recent research
+
+    """
     bearer_token = auth()
     url = create_url(queries)
     headers = create_headers(bearer_token)
-    json_response = connect_to_endpoint(url, headers)
-    res = json.dumps(json_response, indent=2, sort_keys=True)
-    # print("Feched Tweets: ", res)
+    res = connect_to_endpoint(url, headers)
+    d = json.dumps(res, indent=2, sort_keys=True)
+    print("Feched Tweets: ", d)
 
-    matched = mining_txt(keywords, json_response)
+    matched = mining_txt(keywords, res, cond)
     print("Matched Tweets:", json.dumps(matched, indent=2))
     return matched
 

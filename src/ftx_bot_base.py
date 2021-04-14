@@ -9,12 +9,12 @@ from logger import setup_logger
 
 BOT_NAME = config['BOT_NAME']
 MARKET = config['MARKET']
-MAX_ORDER_NUMBER = config.getint('MAX_ORDER_NUMBER')
 TRADABLE = config.getboolean('TRADABLE')
+SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
 VERBOSE = config.getboolean('VERBOSE')
 PUSH_NOTIF = config.getboolean('PUSH_NOTIF')
 MAX_POSITION_SIZE = config.getfloat('MAX_POSITION_SIZE')
-SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
+MAX_ORDER_NUMBER = config.getint('MAX_ORDER_NUMBER')
 
 
 class BotBase:
@@ -141,6 +141,8 @@ class BotBase:
             if reduceOnly:
                 if not self.isvalid_reduce_only(size):
                     return {}, False
+            if not sec_to_expire:
+                sec_to_expire = SEC_TO_EXPIRE
             self.ftx.place_order(
                 market=self.MARKET,
                 side=side,
