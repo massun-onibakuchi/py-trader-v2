@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv(verbose=True)
 PYTHON_ENV = os.environ.get("PYTHON_ENV")
+INI_PATH = os.environ.get("INI_PATH")
 ENV_FILE = '.env.production' if PYTHON_ENV == 'production' else '.env.development'
 dotenv_path = os.path.join(os.getcwd(), ENV_FILE)
 load_dotenv(dotenv_path)
@@ -14,7 +15,7 @@ API_PREFIX = ""
 key_name = "FTX_API_KEY"
 secret_name = "FTX_API_SECRET"
 config = configparser.ConfigParser()
-conf_path = f"./src/setting/{os.path.basename(argv[0])}".replace('.py', '.ini')
+conf_path = INI_PATH if INI_PATH else f"./src/setting/{os.path.basename(argv[0])}".replace('.py', '.ini')
 try:
     if not os.path.isfile(conf_path):
         raise FileNotFoundError

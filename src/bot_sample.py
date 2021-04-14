@@ -26,6 +26,14 @@ class Bot(BotBase):
 
     async def strategy(self, interval):
         self.logger.debug('strategy....')
+        # --position--
+        # self.ftx.positions()
+        # res = await self.ftx.send()
+        # if res[0]['success']:
+        #     data = res[0]['result']
+        #     for pos in data:
+        #         print(pos['future'])
+        #     return
         if self.flag:
             # _, success = await self.get_single_market()
             res, success = await self.place_order(

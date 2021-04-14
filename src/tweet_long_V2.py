@@ -1,4 +1,5 @@
-""" BotBaseを継承したタイプのtweetでロングするボット
+"""
+    BotBaseを継承したタイプのtweetでロングするボット
     エントリーのみで決済しない
 """
 import asyncio
@@ -40,45 +41,44 @@ class Bot(BotBase):
                 self.push_message(f'Unhandled Error :strategy {str(e)}')
 
     async def strategy(self, interval):
-        pos, success = await self.get_position()
-        if not success:
-            return await asyncio.sleep(5)
-        elif pos["size"] > float(MAX_POSITION_SIZE):
-            msg = f'MAX_POSITION_SIZE current size:{pos["size"]}'
-            self.logger.info(msg)
-            self.push_message(msg)
-        else:
-            day = 0 if PYTHON_ENV == 'production' else 1
-            query = QUERY
-            tweet_fields = "tweet.fields=author_id"
-            start_time_fields = create_time_fields(sec=12, day=day)
-            queries = [query, tweet_fields, start_time_fields]
-            keywords = KEY_WORDS
+        # pos, success = await self.get_position()
+        # if not success:
+        #     return await asyncio.sleep(5)
+        # elif pos["size"] > float(MAX_POSITION_SIZE):
+        #     msg = f'MAX_POSITION_SIZE current size:{pos["size"]}'
+        #     self.logger.info(msg)
+        #     self.push_message(msg)
+        #     return await asyncio.sleep(15)
+        day = 0 if PYTHON_ENV == 'production' else 1
+        keywords = KEY_WORDS
+        query = QUERY
+        tweet_fields = "tweet.fields=author_id"
+        start_time_fields = create_time_fields(sec=12, day=day)
+        queries = [query, tweet_fields, start_time_fields]
 
-            result = recent_research(keywords, queries, COND)
+        result = recent_research(keywords, queries, COND)
 
-            if len(result) > 0:
-                self.push_message(f"Detect events:\nkeywords:{keywords}\n{result}")
-                if PYTHON_ENV == 'production':
-                    await self.place_order(
-                        ord_type='market',
-                        side='buy',
-                        price='',
-                        size=3800,
-                        postOnly=False,
-                        ioc=True,
-                        sec_to_expire=SEC_TO_EXPIRE
-                    )
-                else:
-                    await self.place_order(
-                        ord_type='limit',
-                        side='buy',
-                        price=1111,
-                        size=0.001,
-                        postOnly=True,
-                        sec_to_expire=SEC_TO_EXPIRE
-                    )
-
+        if len(result) > 0:
+            self.push_message(f"Detect events:\nkeywords:{keywords}\n{result}")
+            if PYTHON_ENV == 'production':
+                await self.place_order(
+                    ord_type='market',
+                    side='buy',
+                    price='',
+                    size=3800,
+                    postOnly=False,
+                    ioc=True,
+                    sec_to_expire=SEC_TO_EXPIRE
+                )
+            else:
+                await self.place_order(
+                    ord_type='limit',
+                    side='buy',
+                    price=1111,
+                    size=0.001,
+                    postOnly=True,
+                    sec_to_expire=SEC_TO_EXPIRE
+                )
         await asyncio.sleep(interval)
 
 

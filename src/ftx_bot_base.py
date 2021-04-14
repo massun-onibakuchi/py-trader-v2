@@ -343,7 +343,7 @@ class BotBase:
                     if market in pos[key]:
                         return pos, True
                 else:
-                    raise Exception('ERROR res[0] :>> ', res[0]['result'])
+                    raise Exception('GET_POSITION', data)
             else:
                 raise APIRequestError(res[0]['error'])
         except Exception as e:

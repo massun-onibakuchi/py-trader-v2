@@ -88,8 +88,8 @@ def recent_research(keywords, queries, cond='or'):
     url = create_url(queries)
     headers = create_headers(bearer_token)
     res = connect_to_endpoint(url, headers)
-    d = json.dumps(res, indent=2, sort_keys=True)
-    print("Feched Tweets: ", d)
+    # d = json.dumps(res, indent=2, sort_keys=True)
+    # print("Feched Tweets: ", d)
 
     matched = mining_txt(keywords, res, cond)
     print("Matched Tweets:", json.dumps(matched, indent=2))
