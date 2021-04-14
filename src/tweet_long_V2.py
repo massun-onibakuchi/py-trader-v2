@@ -27,14 +27,14 @@ class Bot(BotBase):
         self.MARKET = MARKET
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
-        # tasks = [self.run_strategy()]
-        tasks = [self.run(10), self.run_strategy()]
+        tasks = [self.run_strategy()]
+        # tasks = [self.run(10), self.run_strategy()]
         loop.run_until_complete(asyncio.wait(tasks))
 
     async def run_strategy(self):
         while True:
             try:
-                await self.strategy(10)
+                await self.strategy(5)
                 await asyncio.sleep(10)
             except Exception as e:
                 self.logger.error(f'Unhandled Error :strategy {str(e)}')
