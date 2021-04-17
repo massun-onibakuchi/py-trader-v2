@@ -20,6 +20,7 @@ SIZE = config.getfloat('SIZE')
 QUERY = config['QUERY']
 KEY_WORDS: List[str] = json.loads(config['KEY_WORDS'])
 COND = config['COND']  # `or` OR `and`
+CYCLE = config.getboolean('CYCLE')
 
 
 class Bot(BotBase):
@@ -29,6 +30,8 @@ class Bot(BotBase):
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         tasks = [self.run_strategy()]
+        if CYCLE:
+            tasks = [self.run(10)] + tasks
         # tasks = [self.run(10), self.run_strategy()]
         loop.run_until_complete(asyncio.wait(tasks))
 
