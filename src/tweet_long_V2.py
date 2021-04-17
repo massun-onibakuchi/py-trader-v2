@@ -1,5 +1,6 @@
 """
-    BotBaseを継承したタイプのtweetでロングするボット
+    BotBaseを継承したアーキテクチャ
+    tweetでロングするボット
     エントリーのみで決済しない
 """
 import asyncio
