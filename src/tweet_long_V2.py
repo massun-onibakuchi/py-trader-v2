@@ -38,7 +38,7 @@ class Bot(BotBase):
     async def run_strategy(self):
         while True:
             try:
-                await self.strategy(5)
+                await self.strategy(4)
                 await asyncio.sleep(10)
             except Exception as e:
                 self.logger.error(f'Unhandled Error :strategy {str(e)}')
