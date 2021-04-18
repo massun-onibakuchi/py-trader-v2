@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from urllib.parse import urlencode
 from pprint import pprint
+
 load_dotenv(verbose=True)
 ENV_FILE = '.env.production' if os.environ.get(
     "PYTHON_ENV") == 'production' else '.env.development'
@@ -15,18 +16,18 @@ load_dotenv(dotenv_path)
 
 REST = 'https://api.twitter.com/2'
 
-
-def auth():
-    return os.environ.get("TWITTER_BEARER_TOKEN")
-
-
 # Rate limits https://developer.twitter.com/en/docs/rate-limits
-# 450 requests per 15 - minute window(app auth)
-# 180 requests per 15 - minute window(user auth)
+# 450 requests per 15-minute window(app auth)
+# 180 requests per 15-minute window(user auth)
 
 # https: // developer.twitter.com /en/docs/twitter-api/tweets/timelines/api-reference/get-users-id-tweets
 # 1500 requests per 15-minute window (app auth)
 # 900 requests per 15-minute window (user auth)
+
+
+def auth():
+    return os.environ.get("TWITTER_BEARER_TOKEN")
+
 
 def strftime_back(seconds=0, minutes=0, hours=0, days=0):
     since_date = ""
@@ -103,7 +104,7 @@ def user_timeline(id, exclude=None, start_time=None, end_time=None, tweet_fields
     return connect_to_endpoint('GET', endpoint, params, headers)
 
 
-def recent_research(query, start_time=None, end_time=None, tweet_fields=None):
+def search_recent(query, start_time=None, end_time=None, tweet_fields=None):
     endpoint = f'{REST}/tweets/search/recent'
     params = {'query': query}
     if start_time is not None:
@@ -124,17 +125,20 @@ def keywords_search(keywords, res, cond='or'):
 
 
 if __name__ == "__main__":
+    # query = "from:FTX_Official"
+    # id = '1101264495337365504'  # ftxofficial
     query = "from:elonmusk"
+    id = '44196397'  # elonmusk
     tweet_fields = "author_id"
-    start_time = strftime_back(hours=0, seconds=10)
-    # keywords = ['doge', 'Doge', 'DOGE']
-    keywords = ['autopilot', 'Autopilot']
+    start_time = strftime_back(days=5, hours=12, seconds=10)
+    keywords = ['doge', 'Doge', 'DOGE']
+    # keywords = ['autopilot', 'Autopiot']
 
-    res = recent_research(query, start_time=start_time, tweet_fields=tweet_fields)
+    res = search_recent(query, start_time=start_time, tweet_fields=tweet_fields)
     ('data' in res) and pprint(res['data'])
     print("--------")
 
-    res = user_timeline(id='44196397', start_time=start_time)
+    res = user_timeline(id=id, start_time=start_time)
     ('data' in res) and pprint(res['data'])
     print("--------")
 
