@@ -7,8 +7,8 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 load_dotenv(verbose=True)
-ENV_FILE = '.env.production' if os.environ.get(
-    "PYTHON_ENV") == 'production' else '.env.development'
+ENV_FILE = '.production.env' if os.environ.get(
+    "PYTHON_ENV") == 'production' else '.development.env'
 dotenv_path = join(os.getcwd(), ENV_FILE)
 load_dotenv(dotenv_path)
 
@@ -31,13 +31,11 @@ def create_time_fields(sec=10, day=0):
     return start_time_fields
 
 
-def create_url(queries=[]):
-    # GET /2/tweets/search/recent
+def create_url(endpoint, queries=[]):
     query_strings = ''
     if queries is not []:
         query_strings = ("?" + "".join([q + "&" for q in queries]))[:-1]
-    url = "https://api.twitter.com/2/tweets/search/recent{}".format(
-        query_strings)
+    url = f'{endpoint}{query_strings}'
     return url
 
 
@@ -94,6 +92,10 @@ def recent_research(keywords, queries, cond='or'):
     matched = mining_txt(keywords, res, cond)
     print("Matched Tweets:", json.dumps(matched, indent=2))
     return matched
+
+
+def user_timeline(id):
+    endpoint = f'https://api.twitter.com/2/users/{id}/tweets'
 
 
 if __name__ == "__main__":

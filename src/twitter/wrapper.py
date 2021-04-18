@@ -5,12 +5,15 @@ import json
 from os.path import join
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
+from urllib.parse import urlencode
 
 load_dotenv(verbose=True)
 ENV_FILE = '.env.production' if os.environ.get(
     "PYTHON_ENV") == 'production' else '.env.development'
 dotenv_path = join(os.getcwd(), ENV_FILE)
 load_dotenv(dotenv_path)
+
+REST = 'https://api.twitter.com/2'
 
 
 def auth():
@@ -21,23 +24,22 @@ def auth():
 # 180 requests per 15 - minute window(user auth)
 
 
-def create_time_fields(sec=10, day=0):
+def convert_to_strftime(sec=0, minutes=0, hours=0, days=0):
     since_date = ""
     td = ""
     utc_date = datetime.now(timezone.utc)
-    td = timedelta(days=day, seconds=sec)
+    td = timedelta(days=days, seconds=sec, minutes=minutes, hours=hours)
     since_date = utc_date - td
-    start_time_fields = "start_time=" + since_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return start_time_fields
+    return since_date.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def create_url(queries=[]):
-    # GET /2/tweets/search/recent
-    query_strings = ''
-    if queries is not []:
-        query_strings = ("?" + "".join([q + "&" for q in queries]))[:-1]
-    url = "https://api.twitter.com/2/tweets/search/recent{}".format(
-        query_strings)
+def create_url(method, endpoint, params={}):
+    url = ''
+    if method == "GET" and len(params):
+        url = endpoint + '?' + urlencode(params)
+    else:
+        url = endpoint
+    print("url :>>", url)
     return url
 
 
@@ -46,9 +48,12 @@ def create_headers(bearer_token):
     return headers
 
 
-def connect_to_endpoint(url, headers):
-    response = requests.request("GET", url, headers=headers)
-    print(response.status_code)
+def connect_to_endpoint(method, endpoint, params, headers):
+    response: requests.Response = {}
+    if method == 'GET':
+        url = create_url(method, endpoint, params)
+        response = requests.request("GET", url, headers=headers)
+        # print(response.status_code)
     if response.status_code != 200:
         raise Exception(response.status_code, response.text)
     return response.json()
@@ -80,30 +85,49 @@ def mining_txt(keywords, datas: Dict[str, Any], cond='or'):
     return matched_data
 
 
-def recent_research(keywords, queries, cond='or'):
-    """ tweeter recent research
+def user_timeline(id, exclude=None, start_time=None, end_time=None, tweet_fields=None):
+    endpoint = f'{REST}/users/{id}/tweets'
+    params = {}
+    if exclude is not None:
+        params['exclude'] = exclude
+    if start_time is not None:
+        params['start_time'] = start_time
+    if end_time is not None:
+        params['end_time'] = end_time
+    if tweet_fields is not None:
+        params['tweet.fields'] = tweet_fields
+    headers = create_headers(auth())
+    return connect_to_endpoint('GET', endpoint, params, headers)
 
-    """
+
+def recent_research(query, start_time=None, end_time=None):
+    endpoint = f'{REST}/tweets/search/recent'
+    params = {'query': query}
+    if start_time is not None:
+        params['start_time'] = start_time
+    if end_time is not None:
+        params['end_time'] = end_time
     bearer_token = auth()
-    url = create_url(queries)
     headers = create_headers(bearer_token)
-    res = connect_to_endpoint(url, headers)
+    return connect_to_endpoint('GET', endpoint, params, headers)
+
+
+def keywords_search(keywords, query, start_time, end_time, cond='or'):
+    res = recent_research(query, start_time, end_time)
     # d = json.dumps(res, indent=2, sort_keys=True)
     # print("Feched Tweets: ", d)
-
     matched = mining_txt(keywords, res, cond)
     print("Matched Tweets:", json.dumps(matched, indent=2))
     return matched
 
 
 if __name__ == "__main__":
-    query = "query=from:elonmusk -is:retweet"
-    tweet_fields = "tweet.fields=author_id"
+    query = "from:elonmusk"
+    tweet_fields = "author_id"
     utc_date = datetime.now(timezone.utc)
-    utc_date = utc_date.replace(second=(utc_date.second - 10) % 60)
-    utc_date = utc_date.replace(day=(utc_date.day - 3) % 60)
-    start_time_fields = "start_time=" + utc_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-
+    start_time = convert_to_strftime(days=1)
     keywords = ['doge', 'Doge', 'DOGE']
-    queries = [query, tweet_fields, start_time_fields]
-    recent_research(keywords, queries)
+    recent_research(query)
+    # user_timeline()
+
+    # user_timeline(id='')
