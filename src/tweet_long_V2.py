@@ -65,7 +65,7 @@ class Bot(BotBase):
                     ord_type='market',
                     side='buy',
                     price='',
-                    size=3800,
+                    size=SIZE,
                     postOnly=False,
                     ioc=True,
                     sec_to_expire=SEC_TO_EXPIRE

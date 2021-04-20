@@ -12,7 +12,6 @@ from twitter.wrapper import keywords_search, user_timeline, strftime_back
 MARKET = config['MARKET']
 MARKET_TYPE = config["MARKET_TYPE"]
 
-MAX_POSITION_SIZE = config.getfloat('MAX_POSITION_SIZE')
 SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
 SIZE = config.getfloat('SIZE')
 USER_ID: str = config['USER_ID']
@@ -23,8 +22,6 @@ CYCLE = config.getboolean('CYCLE')
 class Bot(BotBase):
     def __init__(self, market, market_type, api_key, api_secret, subaccount):
         super().__init__(market, market_type, api_key, api_secret, subaccount)
-        self.MARKET = MARKET
-        self.SIZE = SIZE
         # タスクの設定およびイベントループの開始
         loop = asyncio.get_event_loop()
         # tasks = [self.run_strategy()]
@@ -62,7 +59,7 @@ class Bot(BotBase):
                     ord_type='market',
                     side='buy',
                     price='',
-                    size=self.SIZE,
+                    size=SIZE,
                     postOnly=False,
                     ioc=True,
                     sec_to_expire=SEC_TO_EXPIRE
