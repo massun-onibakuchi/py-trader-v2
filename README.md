@@ -33,12 +33,10 @@ To install dependencies,
 To run the bot,
 ` poetry run python file.py`
 
-## How to use
+## Getting started
 
 Prepare `.production.env` beforehand,and then run
 `PYTHON_ENV=production python3 file.py`
-
-ボットの設定をマニュアルで変更するためには，bot の実行ファイル`some-bot.py`名と同名の INI ファイルを`setting/some-bot.ini`を変更する．
 
 To make the bot reboot automatically when it crashes due to errors, use the forever.py script provided:
 
@@ -47,7 +45,11 @@ chmod +x forever.py
 PYTHON_ENV=production  INI_PATH=conf_path ./src/forever.py ./src/file.py
 ```
 
-INI ファイルで記す必要のある変数は，
+## How to use
+
+- INI_PATH はオプショナル，デフォルトで bot の実行ファイル`strategy.py`名と同名の INI ファイルを`setting/strategy.ini`
+- 環境変数`BOT_NAME`と同名の log ファイルを吐く
+- INI ファイルで記す必要のある変数は，
 
 ```
 [DEFAULT]
