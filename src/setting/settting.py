@@ -17,6 +17,7 @@ secret_name = "FTX_API_SECRET"
 config = configparser.ConfigParser()
 conf_path = INI_PATH if INI_PATH else f"./src/setting/{os.path.basename(argv[0])}".replace('.py', '.ini')
 try:
+    print(f"CONFIG_PATH:{conf_path}")
     if not os.path.isfile(conf_path):
         raise FileNotFoundError
     else:

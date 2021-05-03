@@ -11,8 +11,8 @@ from twitter.wrapper import keywords_search, user_timeline, strftime_back
 
 MARKET = config['MARKET']
 MARKET_TYPE = config["MARKET_TYPE"]
-
 SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
+
 SIZE = config.getfloat('SIZE')
 USER_ID: str = config['USER_ID']
 KEY_WORDS: List[str] = json.loads(config['KEY_WORDS'])

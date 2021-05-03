@@ -1,6 +1,5 @@
 """
     BotBaseを継承したアーキテクチャ
-    tweetでロングするボット
     エントリーのみで決済しない
 """
 import asyncio
@@ -10,12 +9,13 @@ from ftx_bot_base import BotBase
 from setting.settting import PYTHON_ENV, FTX_API_KEY, FTX_API_SECRET, SUBACCOUNT, config
 from twitter.wrapper import keywords_search, user_timeline, strftime_back
 
+# essential
 MARKET = config['MARKET']
 MARKET_TYPE = config["MARKET_TYPE"]
 SEC_TO_EXPIRE = config.getfloat('SEC_TO_EXPIRE')
 MAX_POSITION_SIZE = config.getfloat('MAX_POSITION_SIZE')
 
-
+# custom
 SIZE = config.getfloat('SIZE')
 USER_ID = config['USER_ID']
 KEY_WORDS: List[str] = json.loads(config['KEY_WORDS'])

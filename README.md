@@ -36,7 +36,7 @@ To run the bot,
 ## How to use
 
 Prepare `.production.env` beforehand,and then run
-`python3 file.py`
+`PYTHON_ENV=production python3 file.py`
 
 ボットの設定をマニュアルで変更するためには，bot の実行ファイル`some-bot.py`名と同名の INI ファイルを`setting/some-bot.ini`を変更する．
 
@@ -44,7 +44,7 @@ To make the bot reboot automatically when it crashes due to errors, use the fore
 
 ```
 chmod +x forever.py
-./forever.py file.py
+PYTHON_ENV=production  INI_PATH=conf_path ./src/forever.py ./src/file.py
 ```
 
 INI ファイルで記す必要のある変数は，
