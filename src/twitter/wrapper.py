@@ -127,7 +127,7 @@ def keywords_search(keywords, res, cond='or'):
 if __name__ == "__main__":
     # query = "from:FTX_Official"
     # id = '1101264495337365504'  # ftxofficial
-    query = "from:elonmusk"
+    query = "from:Ethers2501"
     id = '44196397'  # elonmusk
     tweet_fields = "author_id"
     start_time = strftime_back(days=5, hours=12, seconds=10)
