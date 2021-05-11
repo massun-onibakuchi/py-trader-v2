@@ -74,9 +74,10 @@ class Bot(BotBase):
                 await self.place_order(
                     ord_type='limit',
                     side='buy',
-                    price=1111,
-                    size=0.001,
+                    price=2500,
+                    size=SIZE,
                     postOnly=True,
+                    ioc=False,
                     sec_to_expire=SEC_TO_EXPIRE
                 )
         await asyncio.sleep(interval)
