@@ -38,8 +38,8 @@ class Bot(BotBase):
     async def run_strategy(self):
         while True:
             try:
-                await self.strategy(0)
-                await asyncio.sleep(10)
+                await self.strategy(10)
+                await asyncio.sleep(0)
             except Exception as e:
                 self.logger.error(f'Unhandled Error :strategy {str(e)}')
                 self.push_message(f'Unhandled Error :strategy {str(e)}')
@@ -54,7 +54,7 @@ class Bot(BotBase):
         #     self.push_message(msg)
         #     return await asyncio.sleep(15)
         days = 0 if PYTHON_ENV == 'production' else 1
-        start_time = strftime_back(seconds=10, days=days)
+        start_time = strftime_back(seconds=interval + 1, days=days)
         res = user_timeline(id=USER_ID, start_time=start_time)
         result = keywords_search(KEY_WORDS, res, COND)
 
